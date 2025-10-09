@@ -6,7 +6,7 @@ namespace EthScanNet.Lib
 {
     public class EScanNetwork
     {
-        public static readonly EScanNetwork MainNet = new("https://api.etherscan.io/api");
+        public static readonly EScanNetwork MainNet = new("https://api.etherscan.io/v2/api?chainid=80002");
         [Obsolete("Will be replaced with MainNet and deprecated")]
         public static readonly EScanNetwork EScanMainNet = new("https://api.etherscan.io/api");
         public static readonly EScanNetwork RopstenNet = new("https://api-ropsten.etherscan.io/api");

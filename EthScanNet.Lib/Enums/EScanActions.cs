@@ -4,6 +4,7 @@ namespace EthScanNet.Lib.Enums
     internal class EScanActions
     {
         public static readonly EScanActions Balance = new("Balance");
+        public static readonly EScanActions BalanceMulti = new("BalanceMulti");
         public static readonly EScanActions TxList = new("TxList");
         public static readonly EScanActions TxListInternal = new( "TxListInternal");
         public static readonly EScanActions TokenNftTx = new("TokenNftTx");
@@ -12,6 +13,7 @@ namespace EthScanNet.Lib.Enums
         public static readonly EScanActions TokenCirculatingSupply = new( "TokenCSupply");
         public static readonly EScanActions TokenBalance = new( "TokenBalance");
         public static readonly EScanActions TxErc20Token = new("TokenTx");
+        public static readonly EScanActions GetLogs = new("GetLogs");
         public static readonly EScanActions GetContractAbi = new("GetAbi");
         public static readonly EScanActions GetContractSourceCode = new("GetSourceCode");
         public static readonly EScanActions VerifySourceCode = new("VerifySourceCode");

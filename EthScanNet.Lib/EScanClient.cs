@@ -6,20 +6,21 @@ namespace EthScanNet.Lib
     public class EScanClient
     {
         public static string ApiKeyToken { get; private set; }
-        
+
         [Obsolete("Please use Client.Network.Url. Property will be deprecated in v2.")]
         public static string BaseUrl { get; private set; }
-        
+
         public EScanNetwork Network { get; }
 
         public static int? ThrottleMs { get; private set; }
-        
+
         public Accounts Accounts { get; }
-        public Tokens Tokens { get;  }
+        public Tokens Tokens { get; }
         public Stats Stats { get; }
         public Contracts Contracts { get; set; }
 
         public Proxy Proxy { get; }
+        public Logs Logs { get; }
 
         /// <summary>
         /// The base connection of the API, use this to access the features from within the account
@@ -38,7 +39,7 @@ namespace EthScanNet.Lib
             this.Stats = new(this);
             this.Proxy = new(this);
             this.Contracts = new(this);
-
+            this.Logs = new(this);
         }
     }
 }

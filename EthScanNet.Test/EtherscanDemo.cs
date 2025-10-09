@@ -6,32 +6,36 @@ using EthScanNet.Lib.Models.ApiResponses.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Stats;
 using EthScanNet.Lib.Models.ApiResponses.Tokens;
+using EthScanNet.Lib.Models.ApiResponses.Logs;
 using EthScanNet.Lib.Models.EScan;
 
 namespace EthScanNet.Test
 {
     public class EtherscanDemo
     {
-        private readonly string _apiKey;
-        private readonly EScanNetwork _network;
+        private readonly string _apiKey = "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
+        private readonly EScanNetwork _network = EScanNetwork.MainNet;
 
         public EtherscanDemo(string apiKey, EScanNetwork network)
         {
-            this._apiKey = apiKey ?? "YourApiKeyToken";
+            this._apiKey = apiKey ?? "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
             this._network = network ?? EScanNetwork.MainNet;
         }
 
         public async Task RunApiCommandsAsync()
         {
+            
+
             Console.WriteLine("Running EtherscanDemo with APIKey: " + this._apiKey);
-            EScanClient client = new(this._network, this._apiKey);
+            EScanClient client = new(EScanNetwork.MainNet, "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM");
 
             try
             {
-                await RunAccountCommandsAsync(client);
-                await RunTokenCommandsAsync(client);
-                await RunStatsCommandsAsync(client);
-                await RunContractCommandsAsync(client);
+                //await RunAccountCommandsAsync(client);
+                //await RunTokenCommandsAsync(client);
+                //await RunStatsCommandsAsync(client);
+                //await RunContractCommandsAsync(client);
+                await RunLogsCommandsAsync(client);
                 Console.WriteLine();
             }
             catch (Exception e)
@@ -135,6 +139,16 @@ namespace EthScanNet.Test
             Console.WriteLine("Verification: " + verificationResponse.Guid);
 
             Console.WriteLine("Contracts test complete");
+        }
+
+        private async Task RunLogsCommandsAsync(EScanClient client)
+        {
+            Console.WriteLine("Logs test started");
+            EScanAddress address = new("0xdAC17F958D2ee523a2206206994597C13D831ec7");
+            //EScanLogs logs = await client.Logs.GetLogsAsync(address, "0x1", "latest");
+            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock:"0x1",toBlock: "latest",topic0: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",page:1,offset:10);
+            Console.WriteLine("GetLogsAsync: " + logs.Message);
+            Console.WriteLine("Logs test complete");
         }
     }
 }

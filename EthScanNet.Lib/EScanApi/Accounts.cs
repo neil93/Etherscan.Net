@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using EthScanNet.Lib.Models.ApiRequests.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
@@ -21,6 +22,17 @@ namespace EthScanNet.Lib.EScanApi
         {
             EScanGetAccountBalance apiGetAccountBalance = new(address, this.Client);
             return await apiGetAccountBalance.SendAsync();
+        }
+
+        /// <summary>
+        /// Get the balance of multiple addresses
+        /// </summary>
+        /// <param name="addresses"></param>
+        /// <returns>A Balances object</returns>
+        public async Task<EScanBalances> GetBalancesAsync(IEnumerable<EScanAddress> addresses)
+        {
+            EScanGetAccountBalances apiGetAccountBalances = new(addresses, this.Client);
+            return await apiGetAccountBalances.SendAsync();
         }
 
         /// <summary>
@@ -156,6 +168,24 @@ namespace EthScanNet.Lib.EScanApi
         {
             EScanGetERC20TokenTransferEvents getTokenTransferEvents = new(address, this.Client);
             return await getTokenTransferEvents.SendAsync();
+        }
+
+        /// <summary>
+        /// Get a list of 'Internal' Transactions by Block Range
+        /// </summary>
+        /// <param name="startBlock">Starting blockNo to retrieve results from</param>
+        /// <param name="endBlock">ending blockNo to retrieve results from</param>
+        /// <param name="page">the number of the page to return</param>
+        /// <param name="offset">the maximum number of results per page to return</param>
+        /// <returns>Returns up to a maximum of the last 10000 transactions only</returns>
+        public async Task<EScanTransactions> GetInternalTransactionsByBlockRangeAsync(
+            ulong? startBlock = null,
+            ulong? endBlock = null,
+            int? page = null,
+            int? offset = null)
+        {
+            EScanGetInternalTransactionsByBlockRange getInternalTransactionsByBlockRange = new(startBlock, endBlock, page, offset, this.Client);
+            return await getInternalTransactionsByBlockRange.SendAsync();
         }
     }
 }
