@@ -12,7 +12,7 @@ namespace EthScanNet.Lib.Extensions
         {
             Type itemType = item.GetType();
             PropertyInfo[] properties = itemType.GetProperties();
-            StringBuilder stringBuilder = new("?");
+            StringBuilder stringBuilder = new("&");
 
             foreach (PropertyInfo propertyInfo in properties)
             {

@@ -1,13 +1,20 @@
-using System;
-using System.Threading.Tasks;
 using EthScanNet.Lib;
 using EthScanNet.Lib.Models.ApiRequests.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Contracts;
+using EthScanNet.Lib.Models.ApiResponses.Logs;
 using EthScanNet.Lib.Models.ApiResponses.Stats;
 using EthScanNet.Lib.Models.ApiResponses.Tokens;
-using EthScanNet.Lib.Models.ApiResponses.Logs;
 using EthScanNet.Lib.Models.EScan;
+using EthScanNet.Lib.Models.Events;
+using Nethereum.ABI.FunctionEncoding.Attributes;
+using Nethereum.Contracts;
+using Nethereum.Hex.HexTypes;
+using Nethereum.RPC.Eth.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace EthScanNet.Test
 {
@@ -143,12 +150,60 @@ namespace EthScanNet.Test
 
         private async Task RunLogsCommandsAsync(EScanClient client)
         {
+            var bindWalletTopic0 = "0x0ca052931610b15a08f6d7b445a2be5e2d377dd2c8945678bb64fbecb2725708";
+            var transferTopic0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+            var redeemTopic0 = "0x378f55a9a0032096f81e501f6fba06e54947e956df2afe99d645ca71183fb269";
+            var preSignedTopic0 = "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022";
+
             Console.WriteLine("Logs test started");
-            EScanAddress address = new("0xdAC17F958D2ee523a2206206994597C13D831ec7");
-            //EScanLogs logs = await client.Logs.GetLogsAsync(address, "0x1", "latest");
-            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock:"0x1",toBlock: "latest",topic0: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",page:1,offset:10);
+            //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
+            // 轉帳
+            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "27461435", toBlock: "latest", topic0: transferTopic0, page: 1, offset: 100);
+            var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
+            Console.WriteLine("Logs transferEvent test complete");
+
+            // 贖回
+            logs = await client.Logs.GetLogsAsync(fromBlock: "27429062", toBlock: "latest", topic0: redeemTopic0, page: 1, offset: 100);
+            var redeemedEvent = await GetBoundWalletEvent<WalletContractEventRedeemed>(logs);
+            Console.WriteLine("Logs redeemedEvent  test complete");
+
+            // 解綁/綁定錢包
+            logs = await client.Logs.GetLogsAsync(fromBlock: "27461435", toBlock: "latest", topic0: bindWalletTopic0, page:1,offset:100);
+            var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
+            Console.WriteLine("Logs boundWalletEvent test complete");
+
+            // 預簽名
+            logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: preSignedTopic0, page: 1, offset: 100);
+            var preSignedEvent = await GetBoundWalletEvent<WalletContractEventPreSigned>(logs);
+            Console.WriteLine("Logs boundWalletEvent test complete");
+
             Console.WriteLine("GetLogsAsync: " + logs.Message);
-            Console.WriteLine("Logs test complete");
+            Console.WriteLine("All Logs test complete");
+        }
+
+
+        /// <summary>
+        /// 轉成Event
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="logs"></param>
+        /// <returns></returns>
+        private async Task<List<EventLog<T>>> GetBoundWalletEvent<T>(EScanLogs logs) where T : IEventDTO, new()
+        {
+            var filterLogs = new List<FilterLog>();
+            filterLogs.AddRange(logs.Logs.Select(l => new FilterLog()
+            {
+                BlockNumber = new HexBigInteger(l.BlockNumber),
+                BlockHash = l.BlockHash,
+                LogIndex = new HexBigInteger(l.LogIndex),
+                Address = l.Address,
+                Data = l.Data,
+                Topics = l.Topics.ToArray(),
+                TransactionHash = l.TransactionHash,
+                TransactionIndex = new HexBigInteger(l.TransactionIndex),
+            }));
+            var decoded = Event<T>.DecodeAllEvents(filterLogs.ToArray());
+            return decoded;
         }
     }
 }

@@ -17,6 +17,9 @@ namespace EthScanNet.Lib.Models.ApiResponses.Logs
         [JsonProperty("blockNumber")]
         public string BlockNumber { get; set; }
 
+        [JsonProperty("blockHash")]
+        public string BlockHash { get; set; }
+        
         [JsonProperty("timeStamp")]
         public string TimeStamp { get; set; }
 
