@@ -158,7 +158,7 @@ namespace EthScanNet.Test
             Console.WriteLine("Logs test started");
             //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
             // Âà±b
-            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "27461435", toBlock: "latest", topic0: transferTopic0, page: 1, offset: 100);
+            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "27425837", toBlock: "27425837", topic0: transferTopic0, page: 1, offset: 100);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
             Console.WriteLine("Logs transferEvent test complete");
 
