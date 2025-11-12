@@ -162,7 +162,7 @@ namespace EthScanNet.Test
 
             // 最新區塊
             var currentBlock = await client.Proxy.CurrentBlock();
-            await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}"); 171
+            await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}"); 
 
             // 轉帳
             EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
