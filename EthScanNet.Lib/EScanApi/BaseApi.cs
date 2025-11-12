@@ -8,7 +8,5 @@ namespace EthScanNet.Lib.EScanApi
         {
             this.Client = client;
         }
-        
-        
-    }
+     }
 }

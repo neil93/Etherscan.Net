@@ -1,10 +1,6 @@
-using System;
-using System.Threading.Tasks;
 using EthScanNet.Lib.Models.ApiRequests.Proxy;
-using EthScanNet.Lib.Models.ApiRequests.Tokens;
 using EthScanNet.Lib.Models.ApiResponses.Proxy;
-using EthScanNet.Lib.Models.ApiResponses.Tokens;
-using EthScanNet.Lib.Models.EScan;
+using System.Threading.Tasks;
 
 namespace EthScanNet.Lib.EScanApi
 {
@@ -19,8 +15,5 @@ namespace EthScanNet.Lib.EScanApi
             EScanEthBlockNumber ethBlockNumber = new(this.Client);
             return await ethBlockNumber.SendAsync();
         }
-        
-
-
     }
 }

@@ -21,12 +21,12 @@ namespace EthScanNet.Test
     public class EtherscanDemo
     {
         private readonly string _apiKey = "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
-        private readonly EScanNetwork _network = EScanNetwork.MainNet;
+        private readonly EScanNetwork _network = EScanNetwork.PolygonMainNet;
 
         public EtherscanDemo(string apiKey, EScanNetwork network)
         {
             this._apiKey = apiKey ?? "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
-            this._network = network ?? EScanNetwork.MainNet;
+            this._network = network ?? EScanNetwork.PolygonMainNet;
         }
 
         public async Task RunApiCommandsAsync()
@@ -34,7 +34,7 @@ namespace EthScanNet.Test
             
 
             Console.WriteLine("Running EtherscanDemo with APIKey: " + this._apiKey);
-            EScanClient client = new(EScanNetwork.MainNet, "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM");
+            EScanClient client = new(EScanNetwork.PolygonMainNet, "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM");
 
             try
             {
@@ -155,25 +155,48 @@ namespace EthScanNet.Test
             var redeemTopic0 = "0x378f55a9a0032096f81e501f6fba06e54947e956df2afe99d645ca71183fb269";
             var preSignedTopic0 = "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022";
 
+            var usdcContractAddress = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";     // USDC 合約地址
+
             Console.WriteLine("Logs test started");
             //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
+
+            // 最新區塊
+            var currentBlock = await client.Proxy.CurrentBlock();
+            await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}"); 171
+
             // 轉帳
-            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "27425837", toBlock: "27425837", topic0: transferTopic0, page: 1, offset: 100);
+            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
+
+            var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
+
+            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe" };  // 使用者錢包合約
+
+            var qq = transferEvent.Where(e => !eoaAddress.Contains(e.Event.From)
+                && e.Log.Address == usdcContractAddress
+                && walletContractAddress.Contains(e.Event.To));
+
+            foreach (var item in qq)
+            {
+                Console.WriteLine($"收到:{item.Event.To},轉帳: {item.Event.Value / 1000000} Usd.");
+            }
+            
+
             Console.WriteLine("Logs transferEvent test complete");
+            
 
             // 贖回
-            logs = await client.Logs.GetLogsAsync(fromBlock: "27429062", toBlock: "latest", topic0: redeemTopic0, page: 1, offset: 100);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "27429062", toBlock: "latest", topic0: redeemTopic0, page: 1, offset: 1000);
             var redeemedEvent = await GetBoundWalletEvent<WalletContractEventRedeemed>(logs);
             Console.WriteLine("Logs redeemedEvent  test complete");
 
             // 解綁/綁定錢包
-            logs = await client.Logs.GetLogsAsync(fromBlock: "27461435", toBlock: "latest", topic0: bindWalletTopic0, page:1,offset:100);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "27461435", toBlock: "latest", topic0: bindWalletTopic0, page:1,offset:1000);
             var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
 
             // 預簽名
-            logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: preSignedTopic0, page: 1, offset: 100);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: preSignedTopic0, page: 1, offset: 1000);
             var preSignedEvent = await GetBoundWalletEvent<WalletContractEventPreSigned>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
 
