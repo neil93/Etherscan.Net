@@ -201,7 +201,7 @@ namespace EthScanNet.Test
         private async Task RunProxyTestCommandsAsync(EScanClient client)
         {
             var usdcContract = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";
-            var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
+            var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };
             var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041"
                 , "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe", "0xa3F2E192415934368EfdD420bd3196fA53988C5C","0x1C338272EA3b765B5642eA6dC1A518c8e2d0e837"
                 , "0x4ee9A50608D8355d50730Bd6A4211074039709e1"
@@ -214,7 +214,8 @@ namespace EthScanNet.Test
             var blockInfo = blockResponse.GetBlockInfo();
 
             // 取得質押USDC合約
-            var stakeTransactions = blockInfo.Transactions.Where(t => t.To != null && t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)).ToList();
+            var stakeTransactions = blockInfo.Transactions.Where(t => walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase) || t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)).ToList();
+
 
             foreach (var stake in stakeTransactions)
             {
