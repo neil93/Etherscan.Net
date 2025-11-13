@@ -1,5 +1,4 @@
 using EthScanNet.Lib;
-using EthScanNet.Lib.EScanApi;
 using EthScanNet.Lib.Models.ApiRequests.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Contracts;
@@ -12,7 +11,6 @@ using EthScanNet.Lib.Models.Events;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
-using Nethereum.Model;
 using Nethereum.RPC.Eth.DTOs;
 using System;
 using System.Collections.Generic;
@@ -216,11 +214,11 @@ namespace EthScanNet.Test
             // 取得質押USDC合約
             var stakeTransactions = blockInfo.Transactions.Where(t => walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase) || t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)).ToList();
 
-
             foreach (var stake in stakeTransactions)
             {
-                // 取得交易收據
+                // 取得交易收據並直接轉換為 Nethereum TransactionReceipt
                 var receiptResponse = await client.Proxy.EthGetTransactionReceipt(stake.Hash);
+                var transactionReceipt = receiptResponse.GetTransactionReceipt();
                 var receiptInfos = receiptResponse.GetReceiptInfo();
 
                 var logs = receiptInfos.Logs.Where(l => l.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase));
@@ -242,6 +240,7 @@ namespace EthScanNet.Test
             {
                 // 取得交易收據
                 var receiptResponse = await client.Proxy.EthGetTransactionReceipt(redeemTransaction.Hash);
+                var redeemReceipt = receiptResponse.GetTransactionReceipt();
                 var receiptInfos = receiptResponse.GetReceiptInfo();
 
                 var redeemEvents = ConvertLogsToEvent<WalletContractEventRedeemed>(receiptInfos.Logs);
@@ -261,6 +260,7 @@ namespace EthScanNet.Test
             {
                 // 取得交易收據
                 var receiptResponse = await client.Proxy.EthGetTransactionReceipt(bindWalletTransaction.Hash);
+                var bindWalletReceipt = receiptResponse.GetTransactionReceipt();
                 var receiptInfos = receiptResponse.GetReceiptInfo();
 
                 var bindWalletEvents = ConvertLogsToEvent<WalletContractEventWalletBound>(receiptInfos.Logs);
@@ -280,17 +280,16 @@ namespace EthScanNet.Test
             {
                 // 取得交易收據
                 var receiptResponse = await client.Proxy.EthGetTransactionReceipt(PreSignTransaction.Hash);
+                var preSignReceipt = receiptResponse.GetTransactionReceipt();
                 var receiptInfos = receiptResponse.GetReceiptInfo();
 
                 var preSignEvents = ConvertLogsToEvent<WalletContractEventPreSigned>(receiptInfos.Logs);
 
                 foreach (var preSign in preSignEvents)
                 {
-                    Console.WriteLine($"PreSign From: {PreSignTransaction.From}, To: {PreSignTransaction.To } RequestId: {preSign.Event.RequestId}, Amount: {preSign.Event.Amount} ByUser: {preSign.Event.ByUser}");
+                    Console.WriteLine($"PreSign From: {PreSignTransaction.From}, To: {PreSignTransaction.To} RequestId: {preSign.Event.RequestId}, Amount: {preSign.Event.Amount} ByUser: {preSign.Event.ByUser}");
                 }
             }
-
-
         }
 
         private async Task RunProxyCommandsAsync(EScanClient client)
