@@ -11,6 +11,7 @@ using EthScanNet.Lib.Models.Events;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
+using Nethereum.Model;
 using Nethereum.RPC.Eth.DTOs;
 using System;
 using System.Collections.Generic;
@@ -44,7 +45,8 @@ namespace EthScanNet.Test
                 //await RunStatsCommandsAsync(client);
                 //await RunContractCommandsAsync(client);
                 //await RunLogsCommandsAsync(client);
-                await RunProxyCommandsAsync(client);
+                //await RunProxyCommandsAsync(client);
+                await RunProxyTestCommandsAsync(client);
                 Console.WriteLine();
             }
             catch (Exception e)
@@ -202,6 +204,34 @@ namespace EthScanNet.Test
             Console.WriteLine("All Logs test complete");
         }
 
+        private async Task RunProxyTestCommandsAsync(EScanClient client)
+        {
+            // Stake
+            var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
+            var blockInfo = blockResponse.GetBlockInfo();
+            var usdcContract = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";
+            // 取得USDC合約
+            var stakeTransactions = blockInfo.Transactions.Where(t => t.To != null && t.To.ToLower() == usdcContract).ToList();
+
+            foreach (var stake in stakeTransactions)
+            {
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(stake.Hash);
+                var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                var logs = receiptInfos.Logs.Where(l => l.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase));
+
+                //var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
+
+                //foreach (var log in logs)
+                //{
+                //    var transferEvent1 = await GetBoundWalletEvent<UsdcEventTransfer>(log);
+                //    Console.WriteLine(log);
+                //}
+
+
+            }
+        }
+
 
         private async Task RunProxyCommandsAsync(EScanClient client)
         {
@@ -227,6 +257,7 @@ namespace EthScanNet.Test
                 Console.WriteLine($"   Gas Used: {blockInfo.GasUsed} / {blockInfo.GasLimit}");
                 Console.WriteLine($"   Transaction Count: {blockInfo.Transactions?.Count ?? 0}\n");
             }
+
 
             // 3. Get block transaction count
             Console.WriteLine("3. Block Transaction Count:");

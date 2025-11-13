@@ -1,3 +1,4 @@
+using EthScanNet.Lib.Models.ApiResponses.Logs;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 

@@ -57,7 +57,7 @@ namespace EthScanNet.Lib.Models.ApiResponses.Proxy
         public string TotalDifficulty { get; set; }
 
         [JsonProperty("transactions")]
-        public List<object> Transactions { get; set; }
+        public List<TransactionInfo> Transactions { get; set; }
 
         [JsonProperty("transactionsRoot")]
         public string TransactionsRoot { get; set; }
