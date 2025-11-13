@@ -4,6 +4,7 @@ using EthScanNet.Lib.Models.ApiRequests.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Logs;
+using EthScanNet.Lib.Models.ApiResponses.Proxy;
 using EthScanNet.Lib.Models.ApiResponses.Stats;
 using EthScanNet.Lib.Models.ApiResponses.Tokens;
 using EthScanNet.Lib.Models.EScan;
@@ -33,8 +34,6 @@ namespace EthScanNet.Test
 
         public async Task RunApiCommandsAsync()
         {
-            
-
             Console.WriteLine("Running EtherscanDemo with APIKey: " + this._apiKey);
             EScanClient client = new(EScanNetwork.PolygonMainNet, "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM");
 
@@ -54,15 +53,13 @@ namespace EthScanNet.Test
                 Console.WriteLine(e);
                 throw;
             }
-            
-            
         }
 
         private async Task RunAccountCommandsAsync(EScanClient client)
         {
             Console.WriteLine("Account test started");
             EScanBalance apiBalance = await client.Accounts.GetBalanceAsync(new("0x0000000000000000000000000000000000001004"));
-            Console.WriteLine("GetBalanceAsync: " +  apiBalance.Message);
+            Console.WriteLine("GetBalanceAsync: " + apiBalance.Message);
             EScanTransactions normalApiTransaction = await client.Accounts.GetNormalTransactionsAsync(new("0x0000000000000000000000000000000000001004"));
             Console.WriteLine("GetNormalTransactionsAsync: " + normalApiTransaction.Message);
             EScanTransactions internalApiTransaction = await client.Accounts.GetInternalTransactionsAsync(new("0x0000000000000000000000000000000000001004"));
@@ -122,7 +119,6 @@ namespace EthScanNet.Test
                 pragma solidity >=0.7.0 <0.9.0;
 
                 contract Storage {
-
                     uint256 number;
 
                     constructor(uint defaultNum_) {
@@ -181,9 +177,7 @@ namespace EthScanNet.Test
                 Console.WriteLine($"����:{item.Event.To},��b: {item.Event.Value / 1000000} Usd.");
             }
 
-
             Console.WriteLine("Logs transferEvent test complete");
-            
 
             // ū�^
             logs = await client.Logs.GetLogsAsync(fromBlock: "78535606", toBlock: "78535606", topic0: redeemTopic0, page: 1, offset: 1000);
@@ -191,7 +185,7 @@ namespace EthScanNet.Test
             Console.WriteLine("Logs redeemedEvent  test complete");
 
             // �Ѹj/�j�w���]
-            logs = await client.Logs.GetLogsAsync(fromBlock: "78535522", toBlock: "78535522", topic0: bindWalletTopic0, page:1,offset:1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "78535522", toBlock: "78535522", topic0: bindWalletTopic0, page: 1, offset: 1000);
             var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
 
@@ -206,32 +200,54 @@ namespace EthScanNet.Test
 
         private async Task RunProxyTestCommandsAsync(EScanClient client)
         {
-            // Stake
-            var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
-            var blockInfo = blockResponse.GetBlockInfo();
             var usdcContract = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";
-            // 取得USDC合約
-            var stakeTransactions = blockInfo.Transactions.Where(t => t.To != null && t.To.ToLower() == usdcContract).ToList();
+            var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
+            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe", "0xa3F2E192415934368EfdD420bd3196fA53988C5C" };
 
-            foreach (var stake in stakeTransactions)
+            // 質押交易
+
+            //// 取得區塊資訊
+            //var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
+            //var blockInfo = blockResponse.GetBlockInfo();
+
+            //// 取得質押USDC合約
+            //var stakeTransactions = blockInfo.Transactions.Where(t => t.To != null && t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            //foreach (var stake in stakeTransactions)
+            //{
+            //    // 取得交易收據
+            //    var receiptResponse = await client.Proxy.EthGetTransactionReceipt(stake.Hash);
+            //    var receiptInfos = receiptResponse.GetReceiptInfo();
+
+            //    var logs = receiptInfos.Logs.Where(l => l.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase));
+            //    var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(logs);
+            //    var resultEvents  = transferEvent.Where(e => e.Log.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase) && !eoaAddress.Contains(e.Event.From) && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
+
+            //    foreach (var transfer in resultEvents)
+            //    {
+            //        Console.WriteLine($"Stake From: {transfer.Event.From}, To: {transfer.Event.To}, Value: {transfer.Event.Value}");
+            //    }
+            //}
+
+            // 贖回交易
+            // 取得區塊資訊
+            var blockRedeemResponse = await client.Proxy.EthGetBlockByNumber("0x4ae5bb6", true);
+            var blockRedeemInfo = blockRedeemResponse.GetBlockInfo();
+            var redeemTransactions = blockRedeemInfo.Transactions.Where(t => walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)).ToList();
+            foreach (var redeemTransaction in redeemTransactions)
             {
-                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(stake.Hash);
+                // 取得交易收據
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(redeemTransaction.Hash);
                 var receiptInfos = receiptResponse.GetReceiptInfo();
 
-                var logs = receiptInfos.Logs.Where(l => l.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase));
+                var redeemEvents = ConvertLogsToEvent<WalletContractEventRedeemed>(receiptInfos.Logs);
 
-                //var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
-
-                //foreach (var log in logs)
-                //{
-                //    var transferEvent1 = await GetBoundWalletEvent<UsdcEventTransfer>(log);
-                //    Console.WriteLine(log);
-                //}
-
-
+                foreach (var redeem in redeemEvents)
+                {
+                    Console.WriteLine($"Redeem From: {redeem.Event.WalletContract}, To: {redeem.Event.Wallet}, Value: {redeem.Event.AmountInDecimal}");
+                }
             }
         }
-
 
         private async Task RunProxyCommandsAsync(EScanClient client)
         {
@@ -247,7 +263,7 @@ namespace EthScanNet.Test
             Console.WriteLine("2. Block Information:");
             var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
             var blockInfo = blockResponse.GetBlockInfo();
-            
+
             if (blockInfo != null)
             {
                 Console.WriteLine($"   Block Number: {blockInfo.Number}");
@@ -257,7 +273,6 @@ namespace EthScanNet.Test
                 Console.WriteLine($"   Gas Used: {blockInfo.GasUsed} / {blockInfo.GasLimit}");
                 Console.WriteLine($"   Transaction Count: {blockInfo.Transactions?.Count ?? 0}\n");
             }
-
 
             // 3. Get block transaction count
             Console.WriteLine("3. Block Transaction Count:");
@@ -269,7 +284,7 @@ namespace EthScanNet.Test
             Console.WriteLine("4. Transaction Information:");
             var txResponse = await client.Proxy.EthGetTransactionByHash("0x27b7bd4f7b0ab41ee3e8054df3a3def1e2851707ed5bbb304e3e75e49b34e9ec");
             var txInfo = txResponse.GetTransactionInfo();
-            
+
             if (txInfo != null)
             {
                 Console.WriteLine($"   Transaction Hash: {txInfo.Hash}");
@@ -284,7 +299,7 @@ namespace EthScanNet.Test
             Console.WriteLine("5. Transaction Receipt:");
             var receiptResponse = await client.Proxy.EthGetTransactionReceipt("0x27b7bd4f7b0ab41ee3e8054df3a3def1e2851707ed5bbb304e3e75e49b34e9ec");
             var receiptInfo = receiptResponse.GetReceiptInfo();
-            
+
             if (receiptInfo != null)
             {
                 Console.WriteLine($"   Transaction Hash: {receiptInfo.TransactionHash}");
@@ -330,12 +345,12 @@ namespace EthScanNet.Test
         }
 
         /// <summary>
-        /// �নEvent
+        /// 建立Event
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="logs"></param>
         /// <returns></returns>
-        private async Task<List<EventLog<T>>> GetBoundWalletEvent<T>(EScanLogs logs) where T : IEventDTO, new()
+        private Task<List<EventLog<T>>> GetBoundWalletEvent<T>(EScanLogs logs) where T : IEventDTO, new()
         {
             var filterLogs = new List<FilterLog>();
             filterLogs.AddRange(logs.Logs.Select(l => new FilterLog()
@@ -345,7 +360,31 @@ namespace EthScanNet.Test
                 LogIndex = new HexBigInteger(l.LogIndex),
                 Address = l.Address,
                 Data = l.Data,
-                Topics = l.Topics.ToArray(),
+                Topics = l.Topics.Cast<object>().ToArray(),
+                TransactionHash = l.TransactionHash,
+                TransactionIndex = new HexBigInteger(l.TransactionIndex),
+            }));
+            var decoded = Event<T>.DecodeAllEvents(filterLogs.ToArray());
+            return Task.FromResult(decoded);
+        }
+
+        /// <summary>
+        /// 轉換 LogInfo 為 EventLog
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="logs"></param>
+        /// <returns></returns>
+        private List<EventLog<T>> ConvertLogsToEvent<T>(IEnumerable<LogInfo> logs) where T : IEventDTO, new()
+        {
+            var filterLogs = new List<FilterLog>();
+            filterLogs.AddRange(logs.Select(l => new FilterLog()
+            {
+                BlockNumber = new HexBigInteger(l.BlockNumber),
+                BlockHash = l.BlockHash,
+                LogIndex = new HexBigInteger(l.LogIndex),
+                Address = l.Address,
+                Data = l.Data,
+                Topics = l.Topics.Cast<object>().ToArray(),
                 TransactionHash = l.TransactionHash,
                 TransactionIndex = new HexBigInteger(l.TransactionIndex),
             }));
