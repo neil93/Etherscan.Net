@@ -162,7 +162,7 @@ namespace EthScanNet.Test
 
             // 最新區塊
             var currentBlock = await client.Proxy.CurrentBlock();
-            await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}"); 
+            await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}");
 
             // 轉帳
             EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
@@ -180,23 +180,23 @@ namespace EthScanNet.Test
             {
                 Console.WriteLine($"收到:{item.Event.To},轉帳: {item.Event.Value / 1000000} Usd.");
             }
-            
+
 
             Console.WriteLine("Logs transferEvent test complete");
             
 
             // 贖回
-            logs = await client.Logs.GetLogsAsync(fromBlock: "27429062", toBlock: "latest", topic0: redeemTopic0, page: 1, offset: 1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "78535606", toBlock: "78535606", topic0: redeemTopic0, page: 1, offset: 1000);
             var redeemedEvent = await GetBoundWalletEvent<WalletContractEventRedeemed>(logs);
             Console.WriteLine("Logs redeemedEvent  test complete");
 
             // 解綁/綁定錢包
-            logs = await client.Logs.GetLogsAsync(fromBlock: "27461435", toBlock: "latest", topic0: bindWalletTopic0, page:1,offset:1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "78535522", toBlock: "78535522", topic0: bindWalletTopic0, page:1,offset:1000);
             var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
 
             // 預簽名
-            logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: preSignedTopic0, page: 1, offset: 1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: "78533675", toBlock: "78533675", topic0: preSignedTopic0, page: 1, offset: 1000);
             var preSignedEvent = await GetBoundWalletEvent<WalletContractEventPreSigned>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
 
