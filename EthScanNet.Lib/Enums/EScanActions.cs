@@ -24,6 +24,19 @@ namespace EthScanNet.Lib.Enums
         public static readonly EScanActions GasTracker = new("GasTracker");
 
         public static readonly EScanActions EthBlockNumber = new("Eth_BlockNumber");
+        public static readonly EScanActions EthGetBlockByNumber = new("Eth_GetBlockByNumber");
+        public static readonly EScanActions EthGetUncleByBlockNumberAndIndex = new("Eth_GetUncleByBlockNumberAndIndex");
+        public static readonly EScanActions EthGetBlockTransactionCountByNumber = new("Eth_GetBlockTransactionCountByNumber");
+        public static readonly EScanActions EthGetTransactionByHash = new("Eth_GetTransactionByHash");
+        public static readonly EScanActions EthGetTransactionByBlockNumberAndIndex = new("Eth_GetTransactionByBlockNumberAndIndex");
+        public static readonly EScanActions EthGetTransactionCount = new("Eth_GetTransactionCount");
+        public static readonly EScanActions EthSendRawTransaction = new("Eth_SendRawTransaction");
+        public static readonly EScanActions EthGetTransactionReceipt = new("Eth_GetTransactionReceipt");
+        public static readonly EScanActions EthCall = new("Eth_Call");
+        public static readonly EScanActions EthGetCode = new("Eth_GetCode");
+        public static readonly EScanActions EthGetStorageAt = new("Eth_GetStorageAt");
+        public static readonly EScanActions EthGasPrice = new("Eth_GasPrice");
+        public static readonly EScanActions EthEstimateGas = new("Eth_EstimateGas");
         
         //public static readonly EthActions BnbSupply = new( "BnbSupply");
 

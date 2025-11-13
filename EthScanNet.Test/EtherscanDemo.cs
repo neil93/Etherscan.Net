@@ -42,7 +42,8 @@ namespace EthScanNet.Test
                 //await RunTokenCommandsAsync(client);
                 //await RunStatsCommandsAsync(client);
                 //await RunContractCommandsAsync(client);
-                await RunLogsCommandsAsync(client);
+                //await RunLogsCommandsAsync(client);
+                await RunProxyCommandsAsync(client);
                 Console.WriteLine();
             }
             catch (Exception e)
@@ -160,10 +161,6 @@ namespace EthScanNet.Test
             Console.WriteLine("Logs test started");
             //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
 
-            // 最新區塊
-            var currentBlock = await client.Proxy.CurrentBlock();
-            await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}");
-
             // 轉帳
             EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
@@ -204,6 +201,18 @@ namespace EthScanNet.Test
             Console.WriteLine("All Logs test complete");
         }
 
+
+        private async Task RunProxyCommandsAsync(EScanClient client)
+        {
+            // 最新區塊
+            //var currentBlock = await client.Proxy.CurrentBlock();
+            //await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}");
+
+
+            var stake = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
+            Console.WriteLine(stake);
+
+        }
 
         /// <summary>
         /// 轉成Event
