@@ -4,13 +4,13 @@ namespace EthScanNet.Lib.Models.EScan
 {
     internal class EScanGenericJsonResponse
     {
-        [JsonProperty("JsonRpc")]
+        [JsonProperty("jsonrpc")]
         public string JsonRpc { get; set; }
         
-        [JsonProperty("Id")]
+        [JsonProperty("id")]
         public int Id { get; set; }
         
         [JsonProperty("result")]
-        public string Result { get; set; }
+        public object Result { get; set; }
     }
 }

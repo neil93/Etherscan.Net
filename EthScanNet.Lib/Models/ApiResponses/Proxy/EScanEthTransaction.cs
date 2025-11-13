@@ -4,6 +4,15 @@ namespace EthScanNet.Lib.Models.ApiResponses.Proxy
 {
     public class EScanEthTransaction : EScanJsonRpcResponse
     {
-        // Transaction data will be in the Result property from base class
+        /// <summary>
+        /// Get the transaction as a strongly-typed TransactionInfo object
+        /// </summary>
+        public TransactionInfo GetTransactionInfo()
+        {
+            if (Result == null) return null;
+            
+            var json = JsonConvert.SerializeObject(Result);
+            return JsonConvert.DeserializeObject<TransactionInfo>(json);
+        }
     }
 }

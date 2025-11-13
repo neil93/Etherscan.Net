@@ -1,4 +1,5 @@
 using EthScanNet.Lib;
+using EthScanNet.Lib.EScanApi;
 using EthScanNet.Lib.Models.ApiRequests.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Contracts;
@@ -156,18 +157,18 @@ namespace EthScanNet.Test
             var redeemTopic0 = "0x378f55a9a0032096f81e501f6fba06e54947e956df2afe99d645ca71183fb269";
             var preSignedTopic0 = "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022";
 
-            var usdcContractAddress = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";     // USDC ¦X¬ù¦a§}
+            var usdcContractAddress = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";     // USDC ï¿½Xï¿½ï¿½ï¿½aï¿½}
 
             Console.WriteLine("Logs test started");
             //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
 
-            // Âà±b
+            // ï¿½ï¿½b
             EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
 
             var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
 
-            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe" };  // ¨Ï¥ÎªÌ¿ú¥]¦X¬ù
+            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe" };  // ï¿½Ï¥ÎªÌ¿ï¿½ï¿½]ï¿½Xï¿½ï¿½
 
             var qq = transferEvent.Where(e => !eoaAddress.Contains(e.Event.From)
                 && e.Log.Address == usdcContractAddress
@@ -175,24 +176,24 @@ namespace EthScanNet.Test
 
             foreach (var item in qq)
             {
-                Console.WriteLine($"¦¬¨ì:{item.Event.To},Âà±b: {item.Event.Value / 1000000} Usd.");
+                Console.WriteLine($"ï¿½ï¿½ï¿½ï¿½:{item.Event.To},ï¿½ï¿½b: {item.Event.Value / 1000000} Usd.");
             }
 
 
             Console.WriteLine("Logs transferEvent test complete");
             
 
-            // Å«¦^
+            // Å«ï¿½^
             logs = await client.Logs.GetLogsAsync(fromBlock: "78535606", toBlock: "78535606", topic0: redeemTopic0, page: 1, offset: 1000);
             var redeemedEvent = await GetBoundWalletEvent<WalletContractEventRedeemed>(logs);
             Console.WriteLine("Logs redeemedEvent  test complete");
 
-            // ¸Ñ¸j/¸j©w¿ú¥]
+            // ï¿½Ñ¸j/ï¿½jï¿½wï¿½ï¿½ï¿½]
             logs = await client.Logs.GetLogsAsync(fromBlock: "78535522", toBlock: "78535522", topic0: bindWalletTopic0, page:1,offset:1000);
             var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
 
-            // ¹wÃ±¦W
+            // ï¿½wÃ±ï¿½W
             logs = await client.Logs.GetLogsAsync(fromBlock: "78533675", toBlock: "78533675", topic0: preSignedTopic0, page: 1, offset: 1000);
             var preSignedEvent = await GetBoundWalletEvent<WalletContractEventPreSigned>(logs);
             Console.WriteLine("Logs boundWalletEvent test complete");
@@ -204,18 +205,101 @@ namespace EthScanNet.Test
 
         private async Task RunProxyCommandsAsync(EScanClient client)
         {
-            // ³Ì·s°Ï¶ô
-            //var currentBlock = await client.Proxy.CurrentBlock();
-            //await Console.Out.WriteLineAsync($"current block: {currentBlock.Result}");
+            Console.WriteLine("=== Proxy API Tests ===\n");
 
+            // 1. Get current block number
+            Console.WriteLine("1. Current Block Number:");
+            var currentBlock = await client.Proxy.EthBlockNumber();
+            Console.WriteLine($"   Hex: {currentBlock.GetBlockNumberHex()}");
+            Console.WriteLine($"   Decimal: {currentBlock.GetBlockNumber()}\n");
 
-            var stake = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
-            Console.WriteLine(stake);
+            // 2. Get block by number
+            Console.WriteLine("2. Block Information:");
+            var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
+            var blockInfo = blockResponse.GetBlockInfo();
+            
+            if (blockInfo != null)
+            {
+                Console.WriteLine($"   Block Number: {blockInfo.Number}");
+                Console.WriteLine($"   Block Hash: {blockInfo.Hash}");
+                Console.WriteLine($"   Miner: {blockInfo.Miner}");
+                Console.WriteLine($"   Timestamp: {blockInfo.Timestamp}");
+                Console.WriteLine($"   Gas Used: {blockInfo.GasUsed} / {blockInfo.GasLimit}");
+                Console.WriteLine($"   Transaction Count: {blockInfo.Transactions?.Count ?? 0}\n");
+            }
 
+            // 3. Get block transaction count
+            Console.WriteLine("3. Block Transaction Count:");
+            var txCount = await client.Proxy.EthGetBlockTransactionCountByNumber("0x4b2da5b");
+            Console.WriteLine($"   Hex: {txCount.GetCountHex()}");
+            Console.WriteLine($"   Decimal: {txCount.GetCount()}\n");
+
+            // 4. Get transaction by hash
+            Console.WriteLine("4. Transaction Information:");
+            var txResponse = await client.Proxy.EthGetTransactionByHash("0x27b7bd4f7b0ab41ee3e8054df3a3def1e2851707ed5bbb304e3e75e49b34e9ec");
+            var txInfo = txResponse.GetTransactionInfo();
+            
+            if (txInfo != null)
+            {
+                Console.WriteLine($"   Transaction Hash: {txInfo.Hash}");
+                Console.WriteLine($"   From: {txInfo.From}");
+                Console.WriteLine($"   To: {txInfo.To}");
+                Console.WriteLine($"   Value: {txInfo.Value}");
+                Console.WriteLine($"   Gas: {txInfo.Gas}");
+                Console.WriteLine($"   Gas Price: {txInfo.GasPrice}\n");
+            }
+
+            // 5. Get transaction receipt
+            Console.WriteLine("5. Transaction Receipt:");
+            var receiptResponse = await client.Proxy.EthGetTransactionReceipt("0x27b7bd4f7b0ab41ee3e8054df3a3def1e2851707ed5bbb304e3e75e49b34e9ec");
+            var receiptInfo = receiptResponse.GetReceiptInfo();
+            
+            if (receiptInfo != null)
+            {
+                Console.WriteLine($"   Transaction Hash: {receiptInfo.TransactionHash}");
+                Console.WriteLine($"   Status: {receiptInfo.Status}");
+                Console.WriteLine($"   Block Number: {receiptInfo.BlockNumber}");
+                Console.WriteLine($"   From: {receiptInfo.From}");
+                Console.WriteLine($"   To: {receiptInfo.To}");
+                Console.WriteLine($"   Gas Used: {receiptInfo.GasUsed}");
+                Console.WriteLine($"   Contract Address: {receiptInfo.ContractAddress ?? "N/A"}");
+                Console.WriteLine($"   Logs Count: {receiptInfo.Logs?.Count ?? 0}\n");
+            }
+
+            // 6. Get transaction count for address
+            Console.WriteLine("6. Address Transaction Count:");
+            var addrTxCount = await client.Proxy.EthGetTransactionCount("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb", "latest");
+            Console.WriteLine($"   Hex: {addrTxCount.GetCountHex()}");
+            Console.WriteLine($"   Decimal: {addrTxCount.GetCount()}\n");
+
+            // 7. Get gas price
+            Console.WriteLine("7. Current Gas Price:");
+            var gasPriceResponse = await client.Proxy.EthGasPrice();
+            Console.WriteLine($"   Hex (Wei): {gasPriceResponse.GetGasPriceHex()}");
+            Console.WriteLine($"   Wei: {gasPriceResponse.GetGasPrice()}");
+            Console.WriteLine($"   Gwei: {gasPriceResponse.GetGasPriceGwei()}\n");
+
+            // 8. Get code (check if address is contract)
+            Console.WriteLine("8. Check if Address is Contract:");
+            var codeResponse = await client.Proxy.EthGetCode("0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", "latest");
+            Console.WriteLine($"   Is Contract: {codeResponse.IsContract()}");
+            Console.WriteLine($"   Code Length: {codeResponse.GetCode()?.Length ?? 0} characters\n");
+
+            // 9. Estimate gas
+            Console.WriteLine("9. Estimate Gas:");
+            var estimateGasResponse = await client.Proxy.EthEstimateGas(
+                to: "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+                value: "0x0",
+                data: "0x70a08231000000000000000000000000742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+            );
+            Console.WriteLine($"   Hex: {estimateGasResponse.GetEstimatedGasHex()}");
+            Console.WriteLine($"   Decimal: {estimateGasResponse.GetEstimatedGas()}\n");
+
+            Console.WriteLine("=== All Proxy Tests Complete ===");
         }
 
         /// <summary>
-        /// Âà¦¨Event
+        /// ï¿½à¦¨Event
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="logs"></param>

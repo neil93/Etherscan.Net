@@ -4,6 +4,21 @@ namespace EthScanNet.Lib.Models.ApiResponses.Proxy
 {
     public class EScanEthCode : EScanJsonRpcResponse
     {
-        // Contract code will be in the Result property from base class
+        /// <summary>
+        /// Get the contract bytecode as a hex string
+        /// </summary>
+        public string GetCode()
+        {
+            return Result?.ToString();
+        }
+
+        /// <summary>
+        /// Check if the address has contract code (is a contract)
+        /// </summary>
+        public bool IsContract()
+        {
+            var code = GetCode();
+            return !string.IsNullOrEmpty(code) && code != "0x";
+        }
     }
 }
