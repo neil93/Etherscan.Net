@@ -202,35 +202,38 @@ namespace EthScanNet.Test
         {
             var usdcContract = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";
             var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
-            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe", "0xa3F2E192415934368EfdD420bd3196fA53988C5C" };
+            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041"
+                , "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe", "0xa3F2E192415934368EfdD420bd3196fA53988C5C","0x1C338272EA3b765B5642eA6dC1A518c8e2d0e837"
+                , "0x4ee9A50608D8355d50730Bd6A4211074039709e1"
+            };
 
             // 質押交易
 
-            //// 取得區塊資訊
-            //var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
-            //var blockInfo = blockResponse.GetBlockInfo();
-
-            //// 取得質押USDC合約
-            //var stakeTransactions = blockInfo.Transactions.Where(t => t.To != null && t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)).ToList();
-
-            //foreach (var stake in stakeTransactions)
-            //{
-            //    // 取得交易收據
-            //    var receiptResponse = await client.Proxy.EthGetTransactionReceipt(stake.Hash);
-            //    var receiptInfos = receiptResponse.GetReceiptInfo();
-
-            //    var logs = receiptInfos.Logs.Where(l => l.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase));
-            //    var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(logs);
-            //    var resultEvents  = transferEvent.Where(e => e.Log.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase) && !eoaAddress.Contains(e.Event.From) && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
-
-            //    foreach (var transfer in resultEvents)
-            //    {
-            //        Console.WriteLine($"Stake From: {transfer.Event.From}, To: {transfer.Event.To}, Value: {transfer.Event.Value}");
-            //    }
-            //}
-
-            // 贖回交易
             // 取得區塊資訊
+            var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
+            var blockInfo = blockResponse.GetBlockInfo();
+
+            // 取得質押USDC合約
+            var stakeTransactions = blockInfo.Transactions.Where(t => t.To != null && t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var stake in stakeTransactions)
+            {
+                // 取得交易收據
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(stake.Hash);
+                var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                var logs = receiptInfos.Logs.Where(l => l.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase));
+                var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(logs);
+                var resultEvents = transferEvent.Where(e => e.Log.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase) && !eoaAddress.Contains(e.Event.From) && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
+
+                foreach (var transfer in resultEvents)
+                {
+                    Console.WriteLine($"Stake From: {transfer.Event.From}, To: {transfer.Event.To}, Value: {transfer.Event.Value}");
+                }
+            }
+
+            //贖回交易
+            //取得區塊資訊
             var blockRedeemResponse = await client.Proxy.EthGetBlockByNumber("0x4ae5bb6", true);
             var blockRedeemInfo = blockRedeemResponse.GetBlockInfo();
             var redeemTransactions = blockRedeemInfo.Transactions.Where(t => walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)).ToList();
@@ -247,6 +250,46 @@ namespace EthScanNet.Test
                     Console.WriteLine($"Redeem From: {redeem.Event.WalletContract}, To: {redeem.Event.Wallet}, Value: {redeem.Event.AmountInDecimal}");
                 }
             }
+
+            // 解綁
+            //0x4ae5b62
+            var blockBindWalletResponse = await client.Proxy.EthGetBlockByNumber("0x4ae5b62", true);
+            var blockBindWalletInfo = blockBindWalletResponse.GetBlockInfo();
+            var bindWalletTransactions = blockBindWalletInfo.Transactions.Where(t => walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)).ToList();
+            foreach (var bindWalletTransaction in bindWalletTransactions)
+            {
+                // 取得交易收據
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(bindWalletTransaction.Hash);
+                var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                var bindWalletEvents = ConvertLogsToEvent<WalletContractEventWalletBound>(receiptInfos.Logs);
+
+                foreach (var bindWallet in bindWalletEvents)
+                {
+                    Console.WriteLine($"UnBindWallet WalletWcontract: {bindWallet.Event.WalletContract}, Wallet: {bindWallet.Event.Wallet}, ByUser: {bindWallet.Event.ByUser}");
+                }
+            }
+
+            // 預簽交易
+            // 0x4ae542b
+            var preSignResponse = await client.Proxy.EthGetBlockByNumber("0x4ae542b", true);
+            var preSignInfo = preSignResponse.GetBlockInfo();
+            var preSignTransactions = preSignInfo.Transactions.Where(t => walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)).ToList();
+            foreach (var PreSignTransaction in preSignTransactions)
+            {
+                // 取得交易收據
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(PreSignTransaction.Hash);
+                var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                var preSignEvents = ConvertLogsToEvent<WalletContractEventPreSigned>(receiptInfos.Logs);
+
+                foreach (var preSign in preSignEvents)
+                {
+                    Console.WriteLine($"PreSign From: {PreSignTransaction.From}, To: {PreSignTransaction.To } RequestId: {preSign.Event.RequestId}, Amount: {preSign.Event.Amount} ByUser: {preSign.Event.ByUser}");
+                }
+            }
+
+
         }
 
         private async Task RunProxyCommandsAsync(EScanClient client)
