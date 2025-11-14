@@ -1,4 +1,5 @@
 using EthScanNet.Lib;
+using EthScanNet.Lib.EScanApi;
 using EthScanNet.Lib.Models.ApiRequests.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
 using EthScanNet.Lib.Models.ApiResponses.Contracts;
@@ -11,10 +12,13 @@ using EthScanNet.Lib.Models.Events;
 using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
+using Nethereum.JsonRpc.Client;
+using Nethereum.Model;
 using Nethereum.RPC.Eth.DTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace EthScanNet.Test
@@ -33,7 +37,7 @@ namespace EthScanNet.Test
         public async Task RunApiCommandsAsync()
         {
             Console.WriteLine("Running EtherscanDemo with APIKey: " + this._apiKey);
-            EScanClient client = new(EScanNetwork.PolygonMainNet, "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM");
+            EScanClient client = new(EScanNetwork.PolygonAmy, "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM");
 
             try
             {
@@ -43,7 +47,8 @@ namespace EthScanNet.Test
                 //await RunContractCommandsAsync(client);
                 //await RunLogsCommandsAsync(client);
                 //await RunProxyCommandsAsync(client);
-                await RunProxyTestCommandsAsync(client);
+                //await RunProxyTestCommandsAsync(client);
+                await RunProxyFucntionCommandsAsync(client);
                 Console.WriteLine();
             }
             catch (Exception e)
@@ -322,6 +327,151 @@ namespace EthScanNet.Test
                 {
                     Console.WriteLine($"eoa GasFee From: {eoaTransaction.From}, To: {eoaTransaction.To} ,Amount: {eoa.Event.Amount}");
                 }
+            }
+        }
+
+        public string GetNumber(string inputNumber, int inputValue)
+        {
+            if (string.IsNullOrWhiteSpace(inputNumber))
+                throw new ArgumentException("十六進位不可為空");
+
+            // 去掉 0x
+            var hex = inputNumber.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? inputNumber.Substring(2)
+                : inputNumber;
+
+            // 十六進位 → 10 進位
+            long number = Convert.ToInt64(hex, 16);
+
+            // 相加
+            number += inputValue;
+
+            // 回傳十六進位（含 0x）
+            return "0x" + number.ToString("X");
+        }
+
+        private async Task<string> GetCurrentBlockNumber(EScanClient client)
+        {
+            var currentBlock = await client.Proxy.EthBlockNumber();
+            return currentBlock.GetBlockNumberHex(); //0x1bad050
+        }
+
+        private async Task RunProxyFucntionCommandsAsync(EScanClient client)
+        {
+            var amoyUsdcContract = "0x5bC0720B80f66C8a0F0ba32F1f949D101C24171A";
+            var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };
+            var walletContractAddress = new string[] { "0x9b6759B42978440e3FED986153B41a3A5e5C6B5e" };
+            var currentNumber = "0x1bad67c"; //await GetCurrentBlockNumber(client);
+            while (true)
+            {
+                var currTimeStamp = DateTimeOffset.Now.Ticks;
+
+                try
+                {
+                    // 質押交易
+
+                    //取得區塊資訊
+                    var blockResponse = await client.Proxy.EthGetBlockByNumber(currentNumber, true);
+
+                    var blockInfo = blockResponse.GetBlockInfo();
+
+                    Console.WriteLine($"區塊號:{currentNumber},時間:{blockInfo.Timestamp}");
+
+                    // 查DB是否有存在這些合約地址
+                    var transactionGroupTo = blockInfo.Transactions.GroupBy(o => o.To).ToList();
+                    // TODO 
+                    // 質押 - Group by to 的地址要去db查詢出是否有存在這些錢包合約地址
+                    // 加入walletContractAddress
+
+                    
+
+                    //取得區塊資訊
+                    var transactions = blockInfo.Transactions.Where(t => t.To != null
+                                                                         && (walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)
+                                                                         || t.To.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase))
+                                                                   )
+                                                             .ToList();
+
+                    foreach (var transaction in transactions)
+                    {
+                        // 取得交易收據
+                        var receiptResponse = await client.Proxy.EthGetTransactionReceipt(transaction.Hash);
+                        var transactionReceipt = receiptResponse.GetTransactionReceipt();
+
+                        var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                        // 質押
+                        var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
+                        var resultEvents = transferEvent.Where(e => e.Log.Address.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase) && !eoaAddress.Contains(e.Event.From) && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
+
+                        foreach (var transfer in resultEvents)
+                        {
+                            Console.WriteLine($"Stake BlockNumber:{transfer.Log.BlockNumber}, From: {transfer.Event.From}, To: {transfer.Event.To}, Value: {transfer.Event.Value}");
+                        }
+
+                        // 贖回交易
+                        var redeemEvents = ConvertLogsToEvent<WalletContractEventRedeemed>(receiptInfos.Logs);
+
+                        foreach (var redeem in redeemEvents)
+                        {
+                            Console.WriteLine($"Redeem From: {redeem.Event.WalletContract}, To: {redeem.Event.Wallet}, Value: {redeem.Event.AmountInDecimal}, ByUser: {redeem.Event.ByUser}");
+                        }
+
+                        // 綁定錢包
+                        var bindWalletEvents = ConvertLogsToEvent<WalletContractEventWalletBound>(receiptInfos.Logs);
+
+                        foreach (var bindWallet in bindWalletEvents)
+                        {
+                            Console.WriteLine($"UnBindWallet WalletWcontract: {bindWallet.Event.WalletContract}, Wallet: {bindWallet.Event.Wallet}, ByUser: {bindWallet.Event.ByUser}");
+                        }
+
+                        // 預簽名
+                        var preSignEvents = ConvertLogsToEvent<WalletContractEventPreSigned>(receiptInfos.Logs);
+
+                        foreach (var preSign in preSignEvents)
+                        {
+                            Console.WriteLine($"PreSign From: {transaction.From}, To: {transaction.To} RequestId: {preSign.Event.RequestId}, Amount: {preSign.Event.Amount} ByUser: {preSign.Event.ByUser}");
+                        }
+                    }
+
+                    currentNumber = GetNumber(currentNumber, 1);
+                }
+                catch (Exception)
+                {
+                    throw;
+                }
+                finally
+                {
+                    var intrvalMs = 2000;
+                    var elapsedMs = ToInt(TimeSpan.FromTicks(DateTimeOffset.Now.Ticks - currTimeStamp).TotalMilliseconds, intrvalMs);
+                    var delayMs = intrvalMs - elapsedMs;
+                    if (delayMs > 100)
+                    {
+                        await Task.Delay(delayMs);
+                    }
+                    else
+                    {
+                        //currentNumber = await GetCurrentBlockNumber(client);
+                        Console.WriteLine($"處理時間超過2秒=>{currentNumber}");
+                    }
+                }
+            }
+        }
+
+        public static int ToInt(object? o, int defaultValue)
+        {
+            if (o == null || o == DBNull.Value)
+            {
+                return defaultValue;
+            }
+
+            try
+            {
+                return Convert.ToInt32(o);
+            }
+            catch
+            {
+                return defaultValue;
             }
         }
 
