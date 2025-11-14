@@ -207,7 +207,7 @@ namespace EthScanNet.Test
 
             // 質押交易
 
-            // 取得區塊資訊
+            //取得區塊資訊
             var blockResponse = await client.Proxy.EthGetBlockByNumber("0x4b2da5b", true);
             var blockInfo = blockResponse.GetBlockInfo();
 
@@ -288,6 +288,39 @@ namespace EthScanNet.Test
                 foreach (var preSign in preSignEvents)
                 {
                     Console.WriteLine($"PreSign From: {PreSignTransaction.From}, To: {PreSignTransaction.To} RequestId: {preSign.Event.RequestId}, Amount: {preSign.Event.Amount} ByUser: {preSign.Event.ByUser}");
+                }
+            }
+
+            // EOA 手續費
+            //0xD02a7763cac2c95D013fBE8A93e406f37F83294f
+
+            var eoaAddressSet = new HashSet<string>(new[] { "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" }, StringComparer.OrdinalIgnoreCase);
+
+            var eoaResponse = await client.Proxy.EthGetBlockByNumber("0x4aec05a", true);
+            var eoaInfo = eoaResponse.GetBlockInfo();
+            var eoaTransactions = eoaInfo.Transactions.Where(t => eoaAddressSet.Contains(t.To, StringComparer.OrdinalIgnoreCase)
+            || eoaAddressSet.Contains(t.From, StringComparer.OrdinalIgnoreCase)).ToList();
+            foreach (var eoaTransaction in eoaTransactions)
+            {
+                // 取得交易收據
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(eoaTransaction.Hash);
+                var eoaReceipt = receiptResponse.GetTransactionReceipt();
+                var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                // 支出POL
+                var eoaPolEvents = ConvertLogsToEvent<LogTransfer>(receiptInfos.Logs);
+
+                foreach (var eoa in eoaPolEvents)
+                {
+                    Console.WriteLine($"eoa POL From: {eoaTransaction.From}, To: {eoaTransaction.To} ,Amount: {eoa.Event.Amount}");
+                }
+
+                // 支出POL
+                var eoaGasEvents = ConvertLogsToEvent<LogFeeTransfer>(receiptInfos.Logs);
+
+                foreach (var eoa in eoaPolEvents)
+                {
+                    Console.WriteLine($"eoa GasFee From: {eoaTransaction.From}, To: {eoaTransaction.To} ,Amount: {eoa.Event.Amount}");
                 }
             }
         }
