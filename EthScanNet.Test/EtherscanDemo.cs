@@ -1,3 +1,4 @@
+using ADRaffy.ENSNormalize;
 using EthScanNet.Lib;
 using EthScanNet.Lib.Models.ApiRequests.Contracts;
 using EthScanNet.Lib.Models.ApiResponses.Accounts;
@@ -12,9 +13,11 @@ using Nethereum.ABI.FunctionEncoding.Attributes;
 using Nethereum.Contracts;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
+using Org.BouncyCastle.Asn1.X509;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace EthScanNet.Test
@@ -354,14 +357,23 @@ namespace EthScanNet.Test
 
         private async Task RunProxyFucntionCommandsAsync(EScanClient client)
         {
+            // USDC Contract - Fake USDC 合約地址
             var amoyUsdcContract = "0x5bC0720B80f66C8a0F0ba32F1f949D101C24171A";
-            var eoaAddress = new string[] { "0x3f1aE60f1358d70B6E69d844e7C9958F96Ad5b73", "0x9fe5C7e092F3e2847465189d80b8444ab39E2208" };
-            var walletContractAddress = new string[] { "0x9b6759B42978440e3FED986153B41a3A5e5C6B5e", "0x8F94AF4fB6EE8401673DCaC6482F440Ec99E3417" };
 
-            var gameContractAddress = new string[] { "0x376C1DAf61e5aE8C71F3BcE00144CF8105957604" };
-            var oracleContractAddress = new string[] { "0x3Aa4381ec8909508D1072494C31D258a097EcB70" };
+            // EOA Address
+            string[] eoaAddress = GetDbEoaAddress();
 
-            var currentNumber = "0x1bcbd1d";// await GetCurrentBlockNumber(client);
+            // Walet Contract Address
+            string[] walletContractAddress = GetWalletContractAddress();
+
+            // Game Contract Address
+            string[] gameContractAddress = GetGameContractAddress();
+
+            // Oracle Contract Address
+            string[] oracleContractAddress = GetOracleContractAddress();
+
+            //var currentNumber = "0x1bcbd1d";// await GetCurrentBlockNumber(client);
+            var currentNumber = await GetCurrentBlockNumber(client);
             while (true)
             {
                 var currTimeStamp = DateTimeOffset.Now.Ticks;
@@ -375,13 +387,16 @@ namespace EthScanNet.Test
 
                     var blockInfo = blockResponse.GetBlockInfo();
 
-                    Console.WriteLine($"區塊號:{currentNumber},時間:{blockInfo.Timestamp}");
+                    //Console.WriteLine($"BlockNumber:{currentNumber} (Decimal: {ConvertHexToDecimal(currentNumber)}),BlackHash:{blockInfo.Hash},BlockTime:{FormatBlockTimestamp(blockInfo.Timestamp)}");
+                    Console.WriteLine($"BlockNumber:{ConvertHexToDecimal(currentNumber)},BlackHash:{blockInfo.Hash},BlockTime:{FormatBlockTimestamp(blockInfo.Timestamp)}");
 
                     // 查DB是否有存在這些合約地址
                     var transactionGroupTo = blockInfo.Transactions.GroupBy(o => o.To).ToList();
-                    // TODO
-                    // 質押 - Group by to 的地址要去db查詢出是否有存在這些錢包合約地址
-                    // 加入walletContractAddress
+                    var transactionGroupFrom = blockInfo.Transactions.GroupBy(o => o.From).ToList();
+                    // TODO - 查詢DB
+                    // 質押 - 用GroupBy To地址查詢是否存在WalletContract裡的地址
+                    // 更新EOA餘額 - 用GroupBy From地查詢是否存在ChainEoaPool裡的地址
+
 
                     //取得區塊資訊
                     var transactions = blockInfo.Transactions.Where(t => t.To != null
@@ -504,6 +519,212 @@ namespace EthScanNet.Test
             }
         }
 
+        private static string[] GetOracleContractAddress()
+        {
+            // 預言機合約地址
+            //SELECT
+            //    ChainOracleId,
+            //    OracleContractAddress,
+            //    IsValid,
+            //    Balance,
+            //    UpdatedTime
+            //FROM ChainOracle
+            //ORDER BY ChainOracleId DESC;
+
+            return new string[] { "0x3Aa4381ec8909508D1072494C31D258a097EcB70",
+"0xd74b32cc4A0525dE63742B9afa3dBfdDbe0e8E2A",
+"0x3b7F34d03f6257B5a963Bfc4B3df9c83Cc885527",
+"0xf9bcD0E2CC9eE0ba644bB86ab4f92b4625CB0b6b",
+"0x51aF0ae34c854779ec4c96C353a5f9524559D534",
+"0x3B01FF840567720B64CA1074D06171317F569996",
+"0x5F6Aa01ecFdDCE523bC7C7a3d01Cb40b58E33772",
+"0x5e6C6CA88958c627c594A48B731Df83C929c353e",
+"0xF4B4191d78B1b525C65A9A7f362004B23aA81d99",
+"0x34c4c7B0F06934820f0b369e6a6192014938e6A9",
+"0xBAC7C8A25d89a9AF3b4834d7aA42A52E9B43A5fc",
+"0x783F7bba55baF0718691CcE0CE1Dc6097130Fa6c",
+"0x76C488f959865b7aA60acF5E5Ea1938F20a1AbA6",
+"0xdC6F6FD7cFfe46000d0AFFAa1c38B65BFe385f90",
+"0x78facc6C97F0cE40b083464B91a6837E358CE6Ce",
+"0xBfA2e13067fb252F2104F0D1E9E7514a77ba5DA4",
+"0x3C4337Cc08C8F8dae832e0EF4f9891bF4834D21E",
+"0x26878F7680c682eC22133B7Ab0f613b8BBC23bF0",
+"0x245a946F42aadB519825326C0e791C49Df6EA8E2",
+"0x61d003E572F069305Aa062d29e4607Ed7b26868A",
+"0x45a95059741552d084D43604EEC6482728FF041b",
+"0xcE29D24cAF9539522F3c9FfDE71254c7cD35E51E",
+"0x3639B4DE3fd49670306989A870e5C79FBfcD665A",
+"0x2876DB121763CA911ff9D024CE1103042dff3d42",
+"0x8dACC6Fd3D4E19e2C04BEC4dCe95312DE94DaD54",
+"0x67A35Cf1601Ee68B90F94079Af01413c25D3C0f8",
+"0xF54F8d2B3B17D834099f83d644A161C73c94CC9B",
+"0xf55bABc7986FBBcD2A10a4b4C21AD456b87760B0",
+"0x76EC479F287B40B77aD4EcF305785D0da6d99DF6",
+"0x8e0D4319E8aFA1152d52D400DB81Bb06A1a83b35",
+"0xf1D5FCEf8bB525053b240FbdE82AC8df0516081e",
+"0xa7aD1E6166cB61b8C545446914eA8fA6972b7256",
+"0x0Fab101029C8925c60F9bB55b4378a651D4c20fd",
+"0x52bAFb11d6f7b0DdE0EBe0B269e0190B152A5da3",
+"0x3413c3F4DCf76f29234401034B7B97669E9185ca",
+"0x1599eD0bC1e7CE632F4fbf0b2210Fc93a923f5ED"
+ };
+        }
+
+        private static string[] GetGameContractAddress()
+        {
+            // 遊戲合約地址
+            // SELECT ChainContractId, ChainContractAddress, Memo, IsUseBalance, Balance, UpdatedTime
+            // FROM ChainContract
+            // WHERE IsUseBalance = 1;
+
+            return new string[] { "0x376C1DAf61e5aE8C71F3BcE00144CF8105957604",
+"0x7a6E0203f766Eef0C142ab7C36D4F3ec78Cbf596",
+"0x71fc36A2514655f9A44aE69840A6bA84d9c2B639",
+"0x36f1AD513816d661458b6d1CF4136fE0D65aAfD2"
+ };
+        }
+
+        private static string[] GetWalletContractAddress()
+        {
+            // @addrs使用GroupBy To的資料
+            //SELECT WalletContractAddress FROM WalletContract
+            //WHERE WalletContractAddress IN @addrs;
+
+            // DEV 環境測試資料
+            return new string[] { "0x01372eCef1854c9F83dBbA35d98101e908D57179",
+"0x03Ecfe6Dec88136D43F37F8DFE34455126f8ea51",
+"0x059Fd9eE8da2b4160d612bD498985b62F72eA917",
+"0x067E92782371b44B191D5E4dAB2510a03dc25BfB",
+"0x08A8E1A6d1F6F169f1b34BC3cD596d1607A6eA24",
+"0x095eaca20b8FcA0CF28a142e0314D259BF288D6B",
+"0x0adDd31CaD1D5e40F35727485628FeB3D225479a",
+"0x0BfD4091DcDC548De0E5cF686554a51F2b2066B9",
+"0x0F89F11F0D23E10aC9a975CD5053e41EbCd64595",
+"0x11b3405C1F59FeFD73915F9D93D01c33981d3f34",
+"0x12283eb630602Ff87A51301C2C1445993389C32A",
+"0x14b2C21bD6C96f3e81955D9Aab7f32FC807eFCCb",
+"0x152476b2D2438C1E3C81AB7ea9ad9da3e293d6Dc",
+"0x1939a27fDA9488B72dE2e2AbDF4e49621A7a1485",
+"0x1A7aAa49840987F1BAF1e0FB3DE87273f55e2dE4",
+"0x1e6c8393e1879488b7d61756Bd371DD2F8a3438B",
+"0x26FF5D7DcB20260165A32C363bf98B3AbEf144D1",
+"0x2A9d2cA9C5841C773C72e21F4f4706027a769a99",
+"0x34b51c0900c009F46FBC08b54e6EcEfF8206A58D",
+"0x35a6aDA08b6E69135Dd77c1D3cc7006DeE340B9C",
+"0x361D54657b0eA26C7dad335A957d1a0F1b7eC9e8",
+"0x384a402Ac95474136E138a9042d2F52E7366AF6d",
+"0x3FC507ABdE2CCfce6C922f4d53c5f57f4e0AFde4",
+"0x40d28c9C3eC262d1694F36e2B5921886B2A4eA95",
+"0x421Ce7C070EEF79a5b6BDA2498695123B3b6a750",
+"0x433767e84578db5b689b49C11cf69bB051c20C8E",
+"0x4B85791A29c4058dc1E37cE67b7c868547BFdd9e",
+"0x50EB2608a87AcF39d8CFF72F104bCEd857127597",
+"0x55EBB9152FEfE6846E24b144f5DA84CC37F248C9",
+"0x580a64c6C9Efe9EcfA016B8a25F1Caa17b1acF85",
+"0x6CaFb3E38B9eF32125fcdcfef1851e2EB23Fe9DA",
+"0x72949b2D0491e5cBa5bf4FdC2b87Bd32567cBcbe",
+"0x72f49050233Bb6B79177bD68DE23Bf5C92838d2D",
+"0x76614BCcF56B316868647802d75C23991f705C66",
+"0x788C2ed80Dd9acA3d79ff8d5A16BAd7a07F5F109",
+"0x78cEaaFbc7aC51EE0fb24Bd4c9Ef87d379fb7105",
+"0x7DaBFaA88a03DF2e68C32C2315b2bD8bA93c1b85",
+"0x878eC148D532e1e00Ed4f90326e70bB0DBe935D8",
+"0x8A3f8e74E3B2a63f013AA06579F765783892ED5c",
+"0x8F94AF4fB6EE8401673DCaC6482F440Ec99E3417",
+"0x92F398696337b202fFf0B1FdF051a9CE0921C34c",
+"0x99110Be91fEF7FE47693877d92135fCeE798A1f9",
+"0x9a4f28da15C98cD99D9752D2A045139f1ebF4Ff9",
+"0x9B1BaD10BEdB04dd5a882A359594cAD8cD6d7331",
+"0x9fbD77c5aaD32140eF890f8f7600A830e90627dA",
+"0xa6Df4165b68Fd877589F5b739b5d35B8a0F27b5A",
+"0xA84205Ec73783a1D81B37c6D28a0178702Df2432",
+"0xa8932c4dc66BC2d90DA4c51aA0212BD16f904218",
+"0xAa82626bA5a13E79fC1Bb377a2030d8D99772Db0",
+"0xAaa9068fCAB399DFab21A6d97338f73b26af3c31",
+"0xB675C33e9F81F79e7763865864cEa27301069677",
+"0xbe208C7DEd637469F43297210Ca1A89633F1e971",
+"0xc1b1A8dc51c867331E8903D8E2a8d73Db1DDc887",
+"0xc94fB954E903Ba0Ce25C6068A78E811C0f1b1897",
+"0xCAD7ED6F147797036604Aa5aeB3e192BE981B98F",
+"0xcBe2C9Ce06652755312025A4E66f6F3079a88116",
+"0xCc70fB183F0Fdd945d6CBBd4Fd16Fa77c303EbAF",
+"0xD35788d9a6471CFf07A57a9A9647fAd42F180eBb",
+"0xD4a7050cacbcD60a46BcA78BD225426aDdf089A3",
+"0xd5b09e9E0B88db2Ee81Be3fBa53AF3bdb8726D86",
+"0xD7859d3f3DA608F0db570A3631ceF5daF116FB8e",
+"0xD9095027083da60D65D4bF4022FBe85522405ABB",
+"0xDA1E20a97D7d6732cBEC82618dDc66826D73df82",
+"0xDd9baE404287c7d88456C04e273Ac84D76Cb98D8",
+"0xE34e08C9ee8cdC49e74e89c651afff51d32a624f",
+"0xe45AeDEE54472c7b1b182D344C2f3601C8bc3a59",
+"0xe5cD56fED7A526EE44d822e638578A2AB2d05727",
+"0xede05992a88eD8192b4cF15F3C570f8EC4307a34",
+"0xf0dBA0bdDc6f09d9B59F709D89C09662b24363F5",
+"0xf647A9866aCEeB0d1CfCFb451Da825272bb247b8",
+"0xF6856b87070B6F38Bc6fAE33052A4D95fCA88C3c",
+"0xF96Df18f8ee8cd4ec831CeB6F336970B3F508307"
+};
+        }
+
+        private static string[] GetDbEoaAddress()
+        {
+            // 查詢語法
+            //SELECT cep.Address
+            //FROM ChainEoaBalance ceb
+            //INNER JOIN ChainEoaPool cep ON ceb.ChainEoaId = cep.ChainEoaId;
+
+            // DEV環境測試資料
+            return new string[] {
+"0x5d3697A3F9f9D825F2a54ec198977aAf9C7Be061",
+"0x919a55d312Bb712c8B3fd75dEaf6a76b4095c542",
+"0x7D88BdBA692c0351929e408999b20a046234ed3c",
+"0x3f1aE60f1358d70B6E69d844e7C9958F96Ad5b73",
+"0x027C39e86014B5027f1128105589bE7f26A074B2",
+"0x551c584c7c29D2A68DBCD4478939c8504C33105a",
+"0x31D3aa532C5b9C422d600E6A63fcB4BaB506d9eC",
+"0xcE99f93Ac77F353824163e2F7690bF7A050C64bD",
+"0xA520d545Caca11aE07B6e8AeB90732292b77Af63",
+"0x202eB53c7D074e34C51223f198284FbF5fA6D63e",
+"0x30fC2AF01033AdCF83bBd1ED0BbE2956210087d4",
+"0x5c67db7E1d2fFa5547b71cD36A4CB674dbD67B35",
+"0xc29c82f27A06939726183Da23D868c00EC445fC0",
+"0xfC204dBE53932f95Ce6C104C45A10ca4706d81F0",
+"0x704AF0f269add6f2C87cecacB7b940ECa3B491A0",
+"0x0551b073588254fE7CD25f89b214cdE03d5b2BfF",
+"0xDC1Ea715ab1f89Bcc5482463bD17bc5c5b1e8a3b",
+"0xCC5B015795401f4ecd4C161d96F7D9eB148EAEf6",
+"0x881aDAc6608c994888bbE9076832Bf0D599d079F",
+"0x48fD8f35879e6cF622C71b13E69681E40115Db1B",
+"0xB1b3ef54188900Da533D9dEe9363dC540F8b016A",
+"0x5f53eD8AC5B7416E8724386e110d9B04b36a4259",
+"0x1018e9Abe30751C189Ab8c792571d655EC9508df",
+"0xdc2b35d27d4b13489bA30Ec47360E3aFfa216E80",
+"0xaC69e7C9900264D15C5B86226089aceE3D328b67",
+"0x13448F09b5ccBf2583DA2AA6576F6DA54B5Bb238",
+"0xd68a5D67ECF43D2Eb7dC2D82f37B249aBcb5A0cd",
+"0x044FF1e03A8431E613a4104416221F3799bDD594",
+"0xcA089fa80804A2810FCcb5Fd215a72a682114AF1",
+"0xD3F0425ACFAA289E6Baba7D5c19C752bdb6ECe8B",
+"0xaD631e48856e6B82CAd13887A63a64E1B2001460",
+"0x1cdaa416EE35374B104aaD15dF4A597c6551A4F5",
+"0x9B4BC8180BF651fFa059A5bD6ad0e756F6C73588",
+"0xEF68B914108Bf4FDE823FE219d0778bD7f45612d",
+"0xD3452324cE44F2E2C716EeF0C6B8954FA402CC4E",
+"0x09b89D1B30b916cE07DD6c37ba03056707442B5E",
+"0xF11E3006bE7fc443b637ac1cfE4B5d6809d3aaC3",
+"0x97321fE4Fd2cC0700D9220f15D3db3F79a560980",
+"0x44A0E9103E1ACd05EAc7f3C4552284806cc63230",
+"0x8601bB78909C9d8AEA4c26836770012dD08273E8",
+"0x3c9D05E5e70A5723e85023F581c942a10EEe7717",
+"0x8C35cc53129b446bE1b3857CEFEAFDA2A705407d",
+"0x19d9066bD4BbE81f09e97570DBC6424d67D5670e",
+"0xe82C13F9B1A40Caee85400A483c71EA229760736",
+"0x7C1cB2876BA9824DA7c747647F7399Db220c4193",
+"0xF19c1b4A6a391667335edfacCbD3393E375787Dd",
+"0x3b9c80C47841f7988d512A601Cd4595EC97DeCdA"
+};
+        }
+
         public static int ToInt(object? o, int defaultValue)
         {
             if (o == null || o == DBNull.Value)
@@ -541,7 +762,7 @@ namespace EthScanNet.Test
                 Console.WriteLine($"   Block Number: {blockInfo.Number}");
                 Console.WriteLine($"   Block Hash: {blockInfo.Hash}");
                 Console.WriteLine($"   Miner: {blockInfo.Miner}");
-                Console.WriteLine($"   Timestamp: {blockInfo.Timestamp}");
+                Console.WriteLine($"   Timestamp: {FormatBlockTimestamp(blockInfo.Timestamp)}");
                 Console.WriteLine($"   Gas Used: {blockInfo.GasUsed} / {blockInfo.GasLimit}");
                 Console.WriteLine($"   Transaction Count: {blockInfo.Transactions?.Count ?? 0}\n");
             }
@@ -662,6 +883,55 @@ namespace EthScanNet.Test
             }));
             var decoded = Event<T>.DecodeAllEvents(filterLogs.ToArray());
             return decoded;
+        }
+
+        private static string FormatBlockTimestamp(string? timestamp)
+        {
+            if (string.IsNullOrWhiteSpace(timestamp))
+                return "N/A";
+
+            try
+            {
+                var t = timestamp.Trim();
+                long value;
+
+                if (t.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                {
+                    // 解析十六進位（不含 0x）
+                    value = Convert.ToInt64(t.Substring(2), 16);
+                }
+                else
+                {
+                    if (!long.TryParse(t, out value))
+                        return t; // 解析失敗，回傳原始字串
+                }
+
+                // 如果數值很大則視為毫秒，否則視為秒
+                DateTimeOffset dto = value > 1_000_000_000_000L
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(value)
+                    : DateTimeOffset.FromUnixTimeSeconds(value);
+
+                return dto.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            }
+            catch
+            {
+                // 任何失敗都回傳原始字串，避免影響主流程
+                return timestamp ?? "N/A";
+            }
+        }
+
+        private static long ConvertHexToDecimal(string hexNumber)
+        {
+            if (string.IsNullOrWhiteSpace(hexNumber))
+                throw new ArgumentException("十六進位不可為空");
+
+            // 去掉 0x 前綴（如果有）
+            var hex = hexNumber.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? hexNumber.Substring(2)
+                : hexNumber;
+
+            // 十六進位 → 十進位
+            return Convert.ToInt64(hex, 16);
         }
     }
 }
