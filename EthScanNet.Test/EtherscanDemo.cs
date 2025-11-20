@@ -17,7 +17,7 @@ namespace EthScanNet.Test
     public class EtherscanDemo
     {
         private readonly string _apiKey;
-        private readonly EScanNetwork _network = EScanNetwork.PolygonMainNet;
+        private readonly EScanNetwork _network;
 
         public EtherscanDemo(string apiKey, EScanNetwork network)
         {
@@ -28,7 +28,7 @@ namespace EthScanNet.Test
         public async Task RunApiCommandsAsync()
         {
             Console.WriteLine($"Running EtherscanDemo with NetWork:{_network}, APIKey:{this._apiKey}");
-            EScanClient client = new(_network, _apiKey, 100);
+            EScanClient client = new(_network, _apiKey);
 
             try
             {
@@ -76,20 +76,49 @@ namespace EthScanNet.Test
             {
                 currentNumber = await GetCurrentBlockNumber(client);
             }
+            var isNeedGetNewBlock = false;
 
             // 每2秒掃描一個區塊
             while (true)
             {
                 var currTimeStamp = DateTimeOffset.Now.Ticks;
-
+                
                 try
                 {
-                    // 質押交易
+                    if (isNeedGetNewBlock)
+                    {
+                        var oldCurrentNumber = currentNumber;
+                        currentNumber = await GetCurrentBlockNumber(client);
+                        var startNumber = ConvertHexToDecimal(oldCurrentNumber);
+                        var endNumber = ConvertHexToDecimal(currentNumber);
+                        Console.WriteLine($"批次處理:{ConvertHexToDecimal(oldCurrentNumber)}-{ConvertHexToDecimal(currentNumber)}");
+
+                        // 使用Logs
+                        //await RunLogsCommandsAsync(client, startNumber.ToString(), endNumber.ToString());
+
+                        for (long i = startNumber; i <= endNumber; i++)
+                        {
+                            var n = "0x" + i.ToString("X");
+                            var block = await client.Proxy.EthGetBlockByNumber(n, true);
+
+                            var info = block.GetBlockInfo();
+                            Console.WriteLine($"=======>Number:{i},Time:{FormatBlockTimestamp(info.Timestamp)}");
+                            await ExecuteBlock(client, amoyUsdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, info);
+                        }
+
+                        isNeedGetNewBlock = false;
+                        currentNumber = GetNumber(currentNumber, 1);
+                    }
 
                     //取得區塊資訊
                     var blockResponse = await client.Proxy.EthGetBlockByNumber(currentNumber, true);
 
                     var blockInfo = blockResponse.GetBlockInfo();
+
+                    if (blockInfo == null)
+                    {
+                        continue;
+                    }
 
                     Console.WriteLine($"BlockNumber:{ConvertHexToDecimal(currentNumber)},BlockTime:{FormatBlockTimestamp(blockInfo.Timestamp)}");
 
@@ -100,104 +129,7 @@ namespace EthScanNet.Test
                     // 質押 - 用GroupBy To地址查詢是否存在WalletContract裡的地址
                     // 更新EOA餘額 - 用GroupBy From地查詢是否存在ChainEoaPool裡的地址
 
-                    //取得區塊資訊
-                    var transactions = blockInfo.Transactions.Where(t => t.To != null
-                                                                         && (walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)
-                                                                         || eoaAddress.Contains(t.From, StringComparer.OrdinalIgnoreCase)
-                                                                         || t.To.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase))
-                                                                   )
-                                                             .ToList();
-
-                    foreach (var transaction in transactions)
-                    {
-                        // 取得交易收據
-                        var receiptResponse = await client.Proxy.EthGetTransactionReceipt(transaction.Hash);
-
-                        // 轉換成SyncBlock Worker的Receipt格式
-                        var transactionReceipt = receiptResponse.GetTransactionReceipt();
-
-                        var receiptInfos = receiptResponse.GetReceiptInfo();
-
-                        // 質押
-                        var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
-                        var resultEvents = transferEvent.Where(e => e.Log.Address.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase)
-                                                                && !eoaAddress.Contains(e.Event.From)
-                                                                && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
-
-                        foreach (var transfer in resultEvents)
-                        {
-                            Console.WriteLine($"Stake BlockNumber:{transfer.Log.BlockNumber}, From: {transfer.Event.From}, To: {transfer.Event.To}, Value: {ChainUnitUtil.ToDecimal(transfer.Event.Value)}");
-                        }
-
-                        // 贖回交易
-                        var redeemEvents = ConvertLogsToEvent<WalletContractEventRedeemed>(receiptInfos.Logs);
-                        foreach (var redeem in redeemEvents)
-                        {
-                            Console.WriteLine($"Redeem From: {redeem.Event.WalletContract}, To: {redeem.Event.Wallet}, Value: {redeem.Event.AmountInDecimal}, ByUser: {redeem.Event.ByUser}");
-                        }
-
-                        // 綁定錢包
-                        var bindWalletEvents = ConvertLogsToEvent<WalletContractEventWalletBound>(receiptInfos.Logs);
-
-                        foreach (var bindWallet in bindWalletEvents)
-                        {
-                            Console.WriteLine($"UnBindWallet WalletWcontract: {bindWallet.Event.WalletContract}, Wallet: {bindWallet.Event.Wallet}, ByUser: {bindWallet.Event.ByUser}");
-                        }
-
-                        // 預簽名
-                        var preSignEvents = ConvertLogsToEvent<WalletContractEventPreSigned>(receiptInfos.Logs);
-
-                        foreach (var preSign in preSignEvents)
-                        {
-                            Console.WriteLine($"PreSign From: {transaction.From}, To: {transaction.To} RequestId: {preSign.Event.RequestId}, Amount: {ChainUnitUtil.ToDecimal(preSign.Event.Amount)} ByUser: {preSign.Event.ByUser}");
-                        }
-
-                        // EOA
-                        var eoaGasEvents = ConvertLogsToEvent<LogFeeTransfer>(receiptInfos.Logs);
-                        foreach (var gas in eoaGasEvents)
-                        {
-                            if (eoaAddress.Contains(gas.Event.From, StringComparer.OrdinalIgnoreCase))
-                            {
-                                Console.WriteLine($"Eoa From: {gas.Event.From}, To: {gas.Event.To}, Amount: {ChainUnitUtil.RoundTo10DecimalPlaces(gas.Event.Amount)}");
-                            }
-                        }
-
-                        var eoaPolEvents = ConvertLogsToEvent<LogTransfer>(receiptInfos.Logs);
-                        foreach (var pol in eoaPolEvents)
-                        {
-                            Console.WriteLine($"Eoa From: {pol.Event.From}, To: {pol.Event.To}, Amount: {ChainUnitUtil.RoundTo10DecimalPlaces(pol.Event.Amount)}");
-                        }
-
-                        // 遊戲轉帳
-                        var gameEvents = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
-                        foreach (var game in gameEvents)
-                        {
-                            if (gameContractAddress.Contains(game.Event.To, StringComparer.OrdinalIgnoreCase))
-                            {
-                                Console.WriteLine($"遊戲 收入 From: {game.Event.From}, To: {game.Event.To}, Amount: {ChainUnitUtil.ToDecimal(game.Event.Value)}");
-                            }
-
-                            if (gameContractAddress.Contains(game.Event.From, StringComparer.OrdinalIgnoreCase))
-                            {
-                                Console.WriteLine($"遊戲 支出 From: {game.Event.From}, To: {game.Event.To}, Amount: {ChainUnitUtil.ToDecimal(game.Event.Value)}");
-                            }
-                        }
-
-                        // 預言機合約轉帳
-                        var oracleEvents = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
-                        foreach (var oracle in oracleEvents)
-                        {
-                            if (oracleContractAddress.Contains(oracle.Event.To, StringComparer.OrdinalIgnoreCase))
-                            {
-                                Console.WriteLine($"預言機 收入 From: {oracle.Event.From}, To: {oracle.Event.To}, Amount: {ChainUnitUtil.ToDecimal(oracle.Event.Value)}");
-                            }
-
-                            if (oracleContractAddress.Contains(oracle.Event.From, StringComparer.OrdinalIgnoreCase))
-                            {
-                                Console.WriteLine($"預言機 支出 From: {oracle.Event.From}, To: {oracle.Event.To}, Amount: {ChainUnitUtil.ToDecimal(oracle.Event.Value)}");
-                            }
-                        }
-                    }
+                    await ExecuteBlock(client, amoyUsdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, blockInfo);
 
                     currentNumber = GetNumber(currentNumber, 1);
                 }
@@ -216,7 +148,110 @@ namespace EthScanNet.Test
                     }
                     else
                     {
-                        Console.WriteLine($"處理時間超過2秒=>{currentNumber}");
+                        Console.WriteLine($"處理時間超過2秒=>{ConvertHexToDecimal(currentNumber)}");
+                        isNeedGetNewBlock= true;
+                    }
+                }
+            }
+        }
+
+        private async Task ExecuteBlock(EScanClient client, string amoyUsdcContract, string[] eoaAddress, string[] walletContractAddress, string[] gameContractAddress, string[] oracleContractAddress, BlockInfo blockInfo)
+        {
+            //取得區塊資訊
+            var transactions = blockInfo.Transactions.Where(t => t.To != null
+                                                                 && (walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)
+                                                                 || eoaAddress.Contains(t.From, StringComparer.OrdinalIgnoreCase)
+                                                                 || t.To.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase))
+                                                           )
+                                                     .ToList();
+
+            foreach (var transaction in transactions)
+            {
+                // 取得交易收據
+                var receiptResponse = await client.Proxy.EthGetTransactionReceipt(transaction.Hash);
+
+                //// 轉換成SyncBlock Worker的Receipt格式
+                var transactionReceipt = receiptResponse.GetTransactionReceipt();
+
+                var receiptInfos = receiptResponse.GetReceiptInfo();
+
+                // 質押
+                var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
+                var resultEvents = transferEvent.Where(e => e.Log.Address.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase)
+                                                        && !eoaAddress.Contains(e.Event.From)
+                                                        && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
+
+                foreach (var transfer in resultEvents)
+                {
+                    Console.WriteLine($"Stake BlockNumber:{transfer.Log.BlockNumber}, From: {transfer.Event.From}, To: {transfer.Event.To}, Value: {ChainUnitUtil.ToDecimal(transfer.Event.Value)}");
+                }
+
+                // 贖回交易
+                var redeemEvents = ConvertLogsToEvent<WalletContractEventRedeemed>(receiptInfos.Logs);
+                foreach (var redeem in redeemEvents)
+                {
+                    Console.WriteLine($"Redeem From: {redeem.Event.WalletContract}, To: {redeem.Event.Wallet}, Value: {redeem.Event.AmountInDecimal}, ByUser: {redeem.Event.ByUser}");
+                }
+
+                // 綁定錢包
+                var bindWalletEvents = ConvertLogsToEvent<WalletContractEventWalletBound>(receiptInfos.Logs);
+
+                foreach (var bindWallet in bindWalletEvents)
+                {
+                    Console.WriteLine($"UnBindWallet WalletWcontract: {bindWallet.Event.WalletContract}, Wallet: {bindWallet.Event.Wallet}, ByUser: {bindWallet.Event.ByUser}");
+                }
+
+                // 預簽名
+                var preSignEvents = ConvertLogsToEvent<WalletContractEventPreSigned>(receiptInfos.Logs);
+
+                foreach (var preSign in preSignEvents)
+                {
+                    Console.WriteLine($"PreSign From: {transaction.From}, To: {transaction.To} RequestId: {preSign.Event.RequestId}, Amount: {ChainUnitUtil.ToDecimal(preSign.Event.Amount)} ByUser: {preSign.Event.ByUser}");
+                }
+
+                // EOA
+                var eoaGasEvents = ConvertLogsToEvent<LogFeeTransfer>(receiptInfos.Logs);
+                foreach (var gas in eoaGasEvents)
+                {
+                    if (eoaAddress.Contains(gas.Event.From, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"Eoa From: {gas.Event.From}, To: {gas.Event.To}, Amount: {ChainUnitUtil.RoundTo10DecimalPlaces(gas.Event.Amount)}");
+                    }
+                }
+
+                var eoaPolEvents = ConvertLogsToEvent<LogTransfer>(receiptInfos.Logs);
+                foreach (var pol in eoaPolEvents)
+                {
+                    Console.WriteLine($"Eoa From: {pol.Event.From}, To: {pol.Event.To}, Amount: {ChainUnitUtil.RoundTo10DecimalPlaces(pol.Event.Amount)}");
+                }
+
+                // 遊戲轉帳
+                var gameEvents = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
+                foreach (var game in gameEvents)
+                {
+                    if (gameContractAddress.Contains(game.Event.To, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"遊戲 收入 From: {game.Event.From}, To: {game.Event.To}, Amount: {ChainUnitUtil.ToDecimal(game.Event.Value)}");
+                    }
+
+                    if (gameContractAddress.Contains(game.Event.From, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"遊戲 支出 From: {game.Event.From}, To: {game.Event.To}, Amount: {ChainUnitUtil.ToDecimal(game.Event.Value)}");
+                    }
+                }
+
+                // 預言機合約轉帳
+                var oracleEvents = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
+                foreach (var oracle in oracleEvents)
+                {
+                    if (oracleContractAddress.Contains(oracle.Event.To, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"預言機 收入 From: {oracle.Event.From}, To: {oracle.Event.To}, Amount: {ChainUnitUtil.ToDecimal(oracle.Event.Value)}");
+                    }
+
+                    if (oracleContractAddress.Contains(oracle.Event.From, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine($"預言機 支出 From: {oracle.Event.From}, To: {oracle.Event.To}, Amount: {ChainUnitUtil.ToDecimal(oracle.Event.Value)}");
                     }
                 }
             }
@@ -227,26 +262,75 @@ namespace EthScanNet.Test
         /// </summary>
         /// <param name="client"></param>
         /// <returns></returns>
-        private async Task RunLogsCommandsAsync(EScanClient client)
+        //private async Task RunLogsCommandsAsync(EScanClient client)
+        //{
+        //    // 正式鏈
+        //    var bindWalletTopic0 = "0x0ca052931610b15a08f6d7b445a2be5e2d377dd2c8945678bb64fbecb2725708";
+        //    var transferTopic0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+        //    var redeemTopic0 = "0x378f55a9a0032096f81e501f6fba06e54947e956df2afe99d645ca71183fb269";
+        //    var preSignedTopic0 = "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022";
+
+        //    var usdcContractAddress = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";     // USDC 合約地址
+
+        //    Console.WriteLine("Logs test started");
+        //    //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
+
+        //    // 質押
+        //    EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
+        //    var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
+
+        //    var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
+
+        //    var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe" };  // �ϥΪ̿��]�X��
+
+        //    var qq = transferEvent.Where(e => !eoaAddress.Contains(e.Event.From)
+        //        && e.Log.Address == usdcContractAddress
+        //        && walletContractAddress.Contains(e.Event.To));
+
+        //    foreach (var item in qq)
+        //    {
+        //        Console.WriteLine($"質押:{item.Event.To},金額: {ChainUnitUtil.RoundTo10DecimalPlaces(item.Event.Value)} Usd.");
+        //    }
+
+        //    Console.WriteLine("Logs transferEvent test complete");
+
+        //    // 贖回
+        //    logs = await client.Logs.GetLogsAsync(fromBlock: "78535606", toBlock: "78535606", topic0: redeemTopic0, page: 1, offset: 1000);
+        //    var redeemedEvent = await GetBoundWalletEvent<WalletContractEventRedeemed>(logs);
+        //    Console.WriteLine("Logs redeemedEvent  test complete");
+
+        //    // 綁定/解綁錢包
+        //    logs = await client.Logs.GetLogsAsync(fromBlock: "78535522", toBlock: "78535522", topic0: bindWalletTopic0, page: 1, offset: 1000);
+        //    var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
+        //    Console.WriteLine("Logs boundWalletEvent test complete");
+
+        //    // 預簽名
+        //    logs = await client.Logs.GetLogsAsync(fromBlock: "78533675", toBlock: "78533675", topic0: preSignedTopic0, page: 1, offset: 1000);
+        //    var preSignedEvent = await GetBoundWalletEvent<WalletContractEventPreSigned>(logs);
+        //    Console.WriteLine("Logs boundWalletEvent test complete");
+
+        //    Console.WriteLine("GetLogsAsync: " + logs.Message);
+        //    Console.WriteLine("All Logs test complete");
+        //}
+
+        private async Task RunLogsCommandsAsync(EScanClient client,string startBlock,string toBlock)
         {
-            // 正式鏈
+            // Amoy
             var bindWalletTopic0 = "0x0ca052931610b15a08f6d7b445a2be5e2d377dd2c8945678bb64fbecb2725708";
             var transferTopic0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
             var redeemTopic0 = "0x378f55a9a0032096f81e501f6fba06e54947e956df2afe99d645ca71183fb269";
             var preSignedTopic0 = "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022";
 
-            var usdcContractAddress = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";     // USDC 合約地址
+            var usdcContractAddress = "0x5bC0720B80f66C8a0F0ba32F1f949D101C24171A";     // USDC 合約地址
 
-            Console.WriteLine("Logs test started");
-            //EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "0x1", toBlock: "latest", topic0: "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022", page:1,offset:100);
 
             // 質押
-            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: "78830144", toBlock: "78830144", topic0: transferTopic0, page: 1, offset: 10000);
+            EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: startBlock, toBlock: toBlock, topic0: transferTopic0, page: 1, offset: 10000);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
 
-            var eoaAddress = new string[] { "0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6", "0xD02a7763cac2c95D013fBE8A93e406f37F83294f" };   // EOA
+            var eoaAddress = GetDbEoaAddress();
 
-            var walletContractAddress = new string[] { "0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d", "0x96e52de6892d4B4811cEaa929E912cCd90fd6041", "0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe" };  // �ϥΪ̿��]�X��
+            var walletContractAddress = GetWalletContractAddress();
 
             var qq = transferEvent.Where(e => !eoaAddress.Contains(e.Event.From)
                 && e.Log.Address == usdcContractAddress
@@ -257,25 +341,25 @@ namespace EthScanNet.Test
                 Console.WriteLine($"質押:{item.Event.To},金額: {ChainUnitUtil.RoundTo10DecimalPlaces(item.Event.Value)} Usd.");
             }
 
-            Console.WriteLine("Logs transferEvent test complete");
+            //Console.WriteLine("Logs transferEvent test complete");
 
             // 贖回
-            logs = await client.Logs.GetLogsAsync(fromBlock: "78535606", toBlock: "78535606", topic0: redeemTopic0, page: 1, offset: 1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: startBlock, toBlock: toBlock, topic0: redeemTopic0, page: 1, offset: 1000);
             var redeemedEvent = await GetBoundWalletEvent<WalletContractEventRedeemed>(logs);
-            Console.WriteLine("Logs redeemedEvent  test complete");
+            //Console.WriteLine("Logs redeemedEvent  test complete");
 
             // 綁定/解綁錢包
-            logs = await client.Logs.GetLogsAsync(fromBlock: "78535522", toBlock: "78535522", topic0: bindWalletTopic0, page: 1, offset: 1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: startBlock, toBlock: toBlock, topic0: bindWalletTopic0, page: 1, offset: 1000);
             var boundWalletEvent = await GetBoundWalletEvent<WalletContractEventWalletBound>(logs);
-            Console.WriteLine("Logs boundWalletEvent test complete");
+            //Console.WriteLine("Logs boundWalletEvent test complete");
 
             // 預簽名
-            logs = await client.Logs.GetLogsAsync(fromBlock: "78533675", toBlock: "78533675", topic0: preSignedTopic0, page: 1, offset: 1000);
+            logs = await client.Logs.GetLogsAsync(fromBlock: startBlock, toBlock: toBlock, topic0: preSignedTopic0, page: 1, offset: 1000);
             var preSignedEvent = await GetBoundWalletEvent<WalletContractEventPreSigned>(logs);
-            Console.WriteLine("Logs boundWalletEvent test complete");
+            //Console.WriteLine("Logs boundWalletEvent test complete");
 
-            Console.WriteLine("GetLogsAsync: " + logs.Message);
-            Console.WriteLine("All Logs test complete");
+            //Console.WriteLine("GetLogsAsync: " + logs.Message);
+            //Console.WriteLine("All Logs test complete");
         }
 
         private string GetNumber(string inputNumber, int inputValue)
