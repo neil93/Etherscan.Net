@@ -24,12 +24,9 @@ namespace EthScanNet.Lib.Utilits
 
         public static decimal RoundTo10DecimalPlaces(BigInteger number)
         {
-            var amount =  UnitConversion.Convert.FromWei(number);
+            var amount = UnitConversion.Convert.FromWei(number);
 
             return RoundTo10DecimalPlaces(amount);
-
-
         }
-
     }
 }

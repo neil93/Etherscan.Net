@@ -1,4 +1,3 @@
-using System;
 using EthScanNet.Lib.EScanApi;
 
 namespace EthScanNet.Lib
