@@ -28,7 +28,7 @@ namespace EthScanNet.Test
         public async Task RunApiCommandsAsync()
         {
             Console.WriteLine($"Running EtherscanDemo with NetWork:{_network}, APIKey:{this._apiKey}");
-            EScanClient client = new(_network, _apiKey);
+            EScanClient client = new(_network, _apiKey, 100);
 
             try
             {
