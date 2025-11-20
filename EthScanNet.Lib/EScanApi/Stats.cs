@@ -8,13 +8,8 @@ namespace EthScanNet.Lib.EScanApi
     //TODO: Need to redo this using interfaces for clarity and ease
     public sealed class Stats : BaseApi
     {
-        public BnbSpecific BscScan { get; }
-        public EthSpecific EtherScan { get; }
-        
         public Stats(EScanClient client) : base(client)
         {
-            this.BscScan = new(client);
-            this.EtherScan = new(client);
         }
  
         /// <summary>
@@ -31,47 +26,6 @@ namespace EthScanNet.Lib.EScanApi
                 
             EScanGetTotalEthCoinSupply getTotalEthCoinSupply = new(this.Client);
             return await getTotalEthCoinSupply.SendAsync();
-        }     
-        
-        [Obsolete("Use Stats.GetTotalSupply(). Class will be removed in v2")]
-        public sealed class BnbSpecific : BaseApi
-        {
-            public BnbSpecific(EScanClient client) : base(client)
-            {
-            }
-            
-            /// <summary>
-            /// Get Total Supply of BNB on the Binance Smart Chain
-            /// </summary>
-            /// <returns></returns>
-            [Obsolete("Use Stats.GetTotalSupply(). Method will be removed in v2")]
-            public async Task<EScanTotalCoinSupply> GetTotalSupply()
-            {
-                EScanGetTotalBscCoinSupply getTotalBscCoinSupply = new(this.Client);
-                return await getTotalBscCoinSupply.SendAsync();
-            }
-
-           
-        }
-
-        [Obsolete("Use Stats.GetTotalSupply(). Class will be removed in v2")]
-        public sealed class EthSpecific : BaseApi
-        {
-            public EthSpecific(EScanClient client) : base(client)
-            {
-            }            
-            
-            /// <summary>
-            /// Get Total Supply of BNB on the Binance Smart Chain
-            /// </summary>
-            /// <returns></returns>
-            [Obsolete("Use Stats.GetTotalSupply(). Method will be removed in v2")]
-            public async Task<EScanTotalCoinSupply> GetTotalSupply()
-            {
-                EScanGetTotalEthCoinSupply getTotalEthCoinSupply = new(this.Client);
-                return await getTotalEthCoinSupply.SendAsync();
-            }
-
         }
     }
 }

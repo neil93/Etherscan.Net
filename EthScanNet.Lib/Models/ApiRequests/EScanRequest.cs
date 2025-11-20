@@ -22,6 +22,7 @@ namespace EthScanNet.Lib.Models.ApiRequests
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
         public string Action { get; }
         private Type _responseType;
+        private EScanClient _client;
 
         //public Type returnType { get; set; }
         internal EScanRequest(EScanClient eScanClient, Type responseType, EScanModules module, EScanActions action)
@@ -32,6 +33,7 @@ namespace EthScanNet.Lib.Models.ApiRequests
                 throw new(type);
             }
             
+            this._client = eScanClient;
             this._responseType = responseType;
             this.Module = module.ToString();
             this.Action = action.ToString();
@@ -40,7 +42,7 @@ namespace EthScanNet.Lib.Models.ApiRequests
         internal async Task<dynamic> SendAsync()
         {
             HttpClient client = new HttpClient();
-            string requestUrl = EScanClient.BaseUrl;
+            string requestUrl = this._client.Network;
             string queryString = this.ToQueryString();
             string finalUrl = requestUrl + queryString + "&apiKey=" + EScanClient.ApiKeyToken;
             Debug.WriteLine(finalUrl);
@@ -95,7 +97,7 @@ namespace EthScanNet.Lib.Models.ApiRequests
         internal async Task<dynamic> SendAsync<T>(T payload)
         {
             HttpClient client = new HttpClient();
-            string requestUrl = EScanClient.BaseUrl;
+            string requestUrl = this._client.Network;
 
             if (EScanClient.ThrottleMs.HasValue)
             {

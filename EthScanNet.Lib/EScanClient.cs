@@ -7,9 +7,6 @@ namespace EthScanNet.Lib
     {
         public static string ApiKeyToken { get; private set; }
 
-        [Obsolete("Please use Client.Network.Url. Property will be deprecated in v2.")]
-        public static string BaseUrl { get; private set; }
-
         public EScanNetwork Network { get; }
 
         public static int? ThrottleMs { get; private set; }
@@ -31,7 +28,6 @@ namespace EthScanNet.Lib
         public EScanClient(EScanNetwork network, string apiKeyToken, int? throttleMs = 200)
         {
             ThrottleMs = throttleMs;
-            BaseUrl = network;
             this.Network = network;
             ApiKeyToken = apiKeyToken;
             this.Accounts = new(this);

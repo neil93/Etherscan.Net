@@ -8,7 +8,6 @@ namespace EthScanNet.Lib
     {
         public static readonly EScanNetwork PolygonMainNet = new("https://api.etherscan.io/v2/api?chainid=137");
         public static readonly EScanNetwork PolygonAmy = new("https://api.etherscan.io/v2/api?chainid=80002");
-        [Obsolete("Will be replaced with MainNet and deprecated")]
         public static readonly EScanNetwork EScanMainNet = new("https://api.etherscan.io/api");
         public static readonly EScanNetwork RopstenNet = new("https://api-ropsten.etherscan.io/api");
         public static readonly EScanNetwork KovanNet = new("https://api-kovan.etherscan.io/api");
