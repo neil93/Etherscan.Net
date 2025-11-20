@@ -12,8 +12,8 @@ namespace EthScanNet.Lib.Models.Events
         [Parameter("uint256", "requestId", 1)]
         public BigInteger RequestId { get; set; }
 
-        [Parameter("uint256", "amount", 2, false)]
-        public BigInteger Amount { get; set; }
+        [Parameter("uint64", "amount", 2, false)]
+        public ulong Amount { get; set; }
 
         [Parameter("bool", "byUser", 3)]
         public bool ByUser { get; set; }

@@ -5,26 +5,23 @@ using System.Threading.Tasks;
 
 namespace EthScanNet.Test
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             RunApiCommands().Wait();
         }
 
         private static async Task RunApiCommands()
         {
-            string apiKey = "";
+            string apiKey = "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
 
             EScanNetwork eScanNetwork = new("https://api-rinkeby.etherscan.io/api");
-            //BscScanDemo demo = new(apiKey);
-            EtherscanDemo demo = new EtherscanDemo(apiKey, EScanNetwork.RinkebyNet);
-
+            EtherscanDemo demo = new EtherscanDemo(apiKey, EScanNetwork.PolygonAmy);
 
             try
             {
                 await demo.RunApiCommandsAsync();
-                //await etherscanDemo.RunApiCommandsAsync();
             }
             catch (Exception e)
             {
@@ -32,7 +29,5 @@ namespace EthScanNet.Test
                 throw;
             }
         }
-
     }
-    
 }
