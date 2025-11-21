@@ -96,15 +96,36 @@ namespace EthScanNet.Test
                         // 使用Logs
                         //await RunLogsCommandsAsync(client, startNumber.ToString(), endNumber.ToString());
 
+                        // 並發處理區塊，最高並發量為3
+                        var semaphore = new System.Threading.SemaphoreSlim(3, 3);
+                        var tasks = new List<Task>();
+
                         for (long i = startNumber; i <= endNumber; i++)
                         {
-                            var n = "0x" + i.ToString("X");
-                            var block = await client.Proxy.EthGetBlockByNumber(n, true);
+                            var blockNumber = i; // 捕獲當前值
+                            
+                            await semaphore.WaitAsync();
+                            
+                            var task = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    var n = "0x" + blockNumber.ToString("X");
+                                    var block = await client.Proxy.EthGetBlockByNumber(n, true).ConfigureAwait(false);
 
-                            var info = block.GetBlockInfo();
-                            Console.WriteLine($"=======>Number:{i},Time:{FormatBlockTimestamp(info.Timestamp)}");
-                            await ExecuteBlock(client, amoyUsdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, info);
+                                    var info = block.GetBlockInfo();
+                                    Console.WriteLine($"=======>Number:{blockNumber},Time:{FormatBlockTimestamp(info.Timestamp)}");
+                                    await ExecuteBlock(client, amoyUsdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, info).ConfigureAwait(false);
+                                }
+                                finally
+                                {
+                                    semaphore.Release();
+                                }
+                            });
+                            tasks.Add(task);
                         }
+
+                        await Task.WhenAll(tasks);
 
                         isNeedGetNewBlock = false;
                         currentNumber = GetNumber(currentNumber, 1);
