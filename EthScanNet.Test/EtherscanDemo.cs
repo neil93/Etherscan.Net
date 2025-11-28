@@ -33,6 +33,7 @@ namespace EthScanNet.Test
             try
             {
                 await RunProxyFucntionCommandsAsync(client);
+
                 Console.WriteLine();
             }
             catch (Exception e)
@@ -49,22 +50,27 @@ namespace EthScanNet.Test
         /// <returns></returns>
         private async Task RunProxyFucntionCommandsAsync(EScanClient client)
         {
-            // 測試Amoy鏈
-            // USDC Contract - Fake USDC 合約地址
-            var amoyUsdcContract = "0x5bC0720B80f66C8a0F0ba32F1f949D101C24171A";
+            var isTestAmoyChain = true;
+            if (client.Network.ToString().Contains("137"))
+            {
+                // 正式鏈
+                isTestAmoyChain = false;
+            }
 
-            // 以下使用Dev環境測試資料
+            // USDC Contract - USDC 合約地址
+            string usdcContract = GetUsdcContract(isTestAmoyChain);
+
             // EOA Address
-            string[] eoaAddress = GetDbEoaAddress();
+            string[] eoaAddress = GetDbEoaAddress(isTestAmoyChain);
 
             // Walet Contract Address
-            string[] walletContractAddress = GetWalletContractAddress();
+            string[] walletContractAddress = GetWalletContractAddress(isTestAmoyChain);
 
             // Game Contract Address
-            string[] gameContractAddress = GetGameContractAddress();
+            string[] gameContractAddress = GetGameContractAddress(isTestAmoyChain);
 
             // Oracle Contract Address
-            string[] oracleContractAddress = GetOracleContractAddress();
+            string[] oracleContractAddress = GetOracleContractAddress(isTestAmoyChain);
 
             string currentNumber;
             var number = 0;  // 要測試特定區塊號時才輸入
@@ -96,19 +102,36 @@ namespace EthScanNet.Test
                         // 使用Logs
                         //await RunLogsCommandsAsync(client, startNumber.ToString(), endNumber.ToString());
 
+                        // 並發處理區塊，最高並發量為3
+                        var semaphore = new System.Threading.SemaphoreSlim(1, 1);
+                        var tasks = new List<Task>();
+
                         for (long i = startNumber; i <= endNumber; i++)
                         {
                             var blockNumber = i; // 捕獲當前值
-                            var n = "0x" + blockNumber.ToString("X");
-                            //var block = await client.Proxy.EthGetBlockByNumber(n, true);
 
-                            var block = await GetBlockByNumber(client, n);
+                            await semaphore.WaitAsync();
 
+                            var task = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    var n = "0x" + blockNumber.ToString("X");
+                                    var block = await GetBlockByNumber(client, n);
 
-                            var info = block.GetBlockInfo();
-                            Console.WriteLine($"=======>Number:{blockNumber},Time:{FormatBlockTimestamp(info.Timestamp)}");
-                            await ExecuteBlock(client, amoyUsdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, info).ConfigureAwait(false);
+                                    var info = block.GetBlockInfo();
+                                    Console.WriteLine($"=======>Number:{blockNumber},Time:{FormatBlockTimestamp(info.Timestamp)}");
+                                    await ExecuteBlock(client, usdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, info).ConfigureAwait(false);
+                                }
+                                finally
+                                {
+                                    semaphore.Release();
+                                }
+                            });
+                            tasks.Add(task);
                         }
+
+                        await Task.WhenAll(tasks);
 
                         isNeedGetNewBlock = false;
                         currentNumber = GetNumber(currentNumber, 1);
@@ -133,7 +156,7 @@ namespace EthScanNet.Test
                     // 質押 - 用GroupBy To地址查詢是否存在WalletContract裡的地址
                     // 更新EOA餘額 - 用GroupBy From地查詢是否存在ChainEoaPool裡的地址
 
-                    await ExecuteBlock(client, amoyUsdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, blockInfo);
+                    await ExecuteBlock(client, usdcContract, eoaAddress, walletContractAddress, gameContractAddress, oracleContractAddress, blockInfo);
 
                     currentNumber = GetNumber(currentNumber, 1);
                 }
@@ -156,6 +179,23 @@ namespace EthScanNet.Test
                         isNeedGetNewBlock = true;
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// 取得USDC合約地址
+        /// </summary>
+        /// <param name="isAmoyTestNet"></param>
+        /// <returns></returns>
+        private static string GetUsdcContract(bool isAmoyTestNet)
+        {
+            if (isAmoyTestNet)
+            {
+                return "0x5bC0720B80f66C8a0F0ba32F1f949D101C24171A";
+            }
+            else
+            {
+                return "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
             }
         }
 
@@ -194,7 +234,7 @@ namespace EthScanNet.Test
 
                 // 取得交易收據
                 var receiptStopwatch = System.Diagnostics.Stopwatch.StartNew();
-                Console.WriteLine($"取得:{transaction.Hash}");
+                Console.WriteLine($"取得交易收據:{transaction.Hash}");
                 var receiptResponse = await client.Proxy.EthGetTransactionReceipt(transaction.Hash);
                 var transactionReceipt = receiptResponse.GetTransactionReceipt();
                 var receiptInfos = receiptResponse.GetReceiptInfo();
@@ -396,9 +436,9 @@ namespace EthScanNet.Test
             EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: startBlock, toBlock: toBlock, topic0: transferTopic0, page: 1, offset: 10000);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
 
-            var eoaAddress = GetDbEoaAddress();
+            var eoaAddress = GetDbEoaAddress(true);
 
-            var walletContractAddress = GetWalletContractAddress();
+            var walletContractAddress = GetWalletContractAddress(true);
 
             var qq = transferEvent.Where(e => !eoaAddress.Contains(e.Event.From)
                 && e.Log.Address == usdcContractAddress
@@ -456,7 +496,12 @@ namespace EthScanNet.Test
             return currentBlock.GetBlockNumberHex(); //0x1bad050
         }
 
-        private static string[] GetOracleContractAddress()
+        /// <summary>
+        /// 預言機合約地址
+        /// </summary>
+        /// <param name="isAmoyTestNet"></param>
+        /// <returns></returns>
+        private static string[] GetOracleContractAddress(bool isAmoyTestNet)
         {
             // 預言機合約地址
             //SELECT
@@ -468,18 +513,10 @@ namespace EthScanNet.Test
             //FROM BcGamePredict.ChainOracle
             //ORDER BY ChainOracleId DESC;
 
-            // 生產
-            return new string[] {
-"0x7C8a1c1732Ec5C82aC08e21B570dAd8Cab4F1826",
-"0x6be9bd7341BA3C92eb6ab6E37ecA65Bfe5FbF1D8",
-"0xC57aCe90DfA3ab979c998B90cc81107C2263C94a",
-"0xFA1952061E9CfEfEF89d64Fb30E93D3aa55A1be7"
-
-            };
-
-
-            // DEV
-            return new string[] {
+            if (isAmoyTestNet)
+            {
+                // DEV
+                return new string[] {
 "0x7e47aBff49a61A68a0ce3E6CaF9B2Dd045bA3512",
 "0x3Aa4381ec8909508D1072494C31D258a097EcB70",
 "0xd74b32cc4A0525dE63742B9afa3dBfdDbe0e8E2A",
@@ -517,150 +554,65 @@ namespace EthScanNet.Test
 "0x52bAFb11d6f7b0DdE0EBe0B269e0190B152A5da3",
 "0x3413c3F4DCf76f29234401034B7B97669E9185ca",
 "0x1599eD0bC1e7CE632F4fbf0b2210Fc93a923f5ED"
-
  };
+            }
+
+            // 生產
+            return new string[] {
+"0xD8846C0e08fA96db2E6F6C2C747055065378C282"
+            };
         }
 
-        private static string[] GetGameContractAddress()
+        /// <summary>
+        /// 遊戲合約地址
+        /// </summary>
+        /// <param name="isAmoyTestNet"></param>
+        /// <returns></returns>
+        private static string[] GetGameContractAddress(bool isAmoyTestNet)
         {
             // 遊戲合約地址
             // SELECT ChainContractId, ChainContractAddress, Memo, IsUseBalance, Balance, UpdatedTime
             // FROM BcChain.ChainContract
             // WHERE IsUseBalance = 1;
-            // 生產
-            return new string[] {
-"0xE47bd03B500D23d16CF8F131dC2b8BD3dE92559A",
-"0x23b4f20401154a71de812A67dB18E4a8a5c51F66",
-"0xF70Cf19324dDd9644ddd2d2A4c0633Cfc9D69223",
-"0xd8d45d32f0CA0088109Eb92E6A838fE2be46730C"
 
-
-            };
-
-
-            // dev
-            return new string[] {
+            if (isAmoyTestNet)
+            {
+                // dev
+                return new string[] {
 "0x574795e696654Bb69e93DC180521699Ddf85e325",
 "0x4981a86fb363e1BBEa124863F959E312801d588a",
 "0x336Fc2704Ee63B704BDF80f128a509A773b6d936",
 "0x9820EdEd7d978C4A037bD4139f5C9faD8C4Fd992"
  };
+            }
+
+            // 生產
+            return new string[] {
+"0xaD13cCbACB8bd5162F110968b50AD53d06A5ED4d",
+"0xf681b197Be290C3244C378F68F35F1Ff0605DdcE",
+"0x07196422E0b303384E652037629E79BBE3da9886",
+"0x8C27cE280B11E116783bb00C1463bD09dA20d671",
+"0x3d3EB175f0a9952156d09FA862c43F925a5670b2",
+"0xc0A3ec04cA20941a78B6c16F6FFdD75823F96B1E"
+
+            };
         }
 
-        private static string[] GetWalletContractAddress()
+        /// <summary>
+        /// 系統錢包合約地址
+        /// </summary>
+        /// <param name="isAmoyTestNet"></param>
+        /// <returns></returns>
+        private static string[] GetWalletContractAddress(bool isAmoyTestNet)
         {
             // @addrs使用GroupBy To的資料
             //SELECT WalletContractAddress FROM BcFramework.WalletContract
             //WHERE WalletContractAddress IN @addrs;
 
-            // 生產
-            return new string[] {
-"0x037719d2C6706c3F0E3c4A6B59547b6c497A45B1",
-"0x0B861b07477Ed4A929dd95286D1B88B3565DA340",
-"0x0d291c0373Da459c8ED8D48b27fb7c84e4325973",
-"0x0f69f06C8AA142CD1622AD6bc763c597C2f2c9dB",
-"0x0F7B6aC80951B68301b4321a7D34f76E03AF06Fe",
-"0x1175253e9F24c8537C8B200940c6D15c7b2a7006",
-"0x117b081D52d788a515b21735496dA1C8e53C24Ed",
-"0x11e5936ee888B401ff9056df5761e979b446C40c",
-"0x131d04ae8001c48EA9CcDfB49726856624B1c6dF",
-"0x156d31F26ac1193e2210286543D81E6F09e65c32",
-"0x15e108ceF8f0c80567745583A41F3173FC7E0685",
-"0x1C338272EA3b765B5642eA6dC1A518c8e2d0e837",
-"0x1EffeEF24B598711029f1156192c7dcCcd124f52",
-"0x20468D6378f57b03ad353143962f812d857c33DE",
-"0x228FbE3282C8D509cd0228c66A5EA79f4c6D08D3",
-"0x23a5feBB248FCbf3688D09006C3996c906d478f3",
-"0x25E1c355ff6B76E1BD6926f8CDafB671F93590Ff",
-"0x267597B9b2f0b51381E1305B56582E0B5fc38987",
-"0x26D2A13ab0d5De8CcFFa60e7ae82EC3eA05e85c8",
-"0x26eF275483375D5C0752264beE741cC05782ad0b",
-"0x2A199aa6452c417Eb149D9eA0aF8e1d1F56cF2EC",
-"0x2deA6FE7c3ed3C002AE7008ED1aC584F7b5B4e95",
-"0x2E07B420101AB96054f894cf117C4d598c017505",
-"0x344ea001E9d1CDF7935A6dCE8341EC3E4A4e2256",
-"0x36d7d614a39e0Df6a4c887cE3daF090c902f002a",
-"0x3AB3a22511BF94cD568497656987Fa8b9fD3a129",
-"0x3C693928aD41e4116A3b87159F85eA8286968faf",
-"0x3CEE5f153fD644f41126dEEd18Aa4d3192b539e2",
-"0x3D416322D970f898F2Aa5C27f560AF40fcf29618",
-"0x3deD53177372C0315f03fF54655ba0943b5ebF96",
-"0x3FEc85bA4198F2bFa2e67E8d475e0ea9f78Ce300",
-"0x418A0F9eFE56978CE700aEa7F9109141FFF1a572",
-"0x41Ef95b658Fc58Fe1A175c0435b08Da795896FbA",
-"0x443e1284eB766fE4C34F8056122afdAbbDBef8b3",
-"0x446e7B3e29Bda0773282A01C6881DBa65F6A5784",
-"0x4483e35A6a663476448281Ba2eaA77b0F0d32fd2",
-"0x4590CEdE36AA001c231Ac5D6943EcC6096696F4d",
-"0x490679AB0D56e0aEb3bDeb943b9c28abD92Bd2C9",
-"0x49b7715a61e837022fEbcDad8cadf4568dc82c79",
-"0x4C8485Bd0F4365CaFb15a1009072537288bBf528",
-"0x4ee9A50608D8355d50730Bd6A4211074039709e1",
-"0x4fA3f8e026DD8157B822c6509860e7FD1256FBB0",
-"0x518Db6da3EEAbD6f92ba9f7d1DA43092522dC8b3",
-"0x54fd006525Ab8B4cc82727Ce8dB8Bd103B79c0b0",
-"0x56EE2230749552A184ba6724c3467d7bff4a1B61",
-"0x5Cb958dC86D49294348FF707f3C3fAE863895603",
-"0x5e3F5E31185529af12aB96D8E69B714406Eb064C",
-"0x609AE09efa694cB168ce2db73F956db5a17BA94A",
-"0x68ed0Baa14Bbe91F961822E30842a6Ce239bF0E5",
-"0x70D74B6548C0E8c524b2b2B0997E3E539C93D72d",
-"0x724731EFB368b1cF663Ef6db3F355616dDb1c539",
-"0x753960438B4a88cefEFfbce79b4f0d2f0E24F9A1",
-"0x7577B7Cdb748dca253c7433545dB6949a4C86dFc",
-"0x7A7d6D1826897c07f3773e6c4e2e5fdE02Df150D",
-"0x7b2822A5aFd93CeCD38A544c18D41156C0D4c6f4",
-"0x7Cd761720036fCC915937053596e465d25511a18",
-"0x815EFdA9D5A5A3f0Af50e6f90C121D0B2e61A291",
-"0x816eA948B1f360975a8A541834071F790E3Dd3a1",
-"0x8549423520262fF0eF37c49d5253c01Eb7B4FEfb",
-"0x8910b5DeE49ADBc6480A0A7a04452060f11C522E",
-"0x8Fb0B35A9cE4519DeBeB7F1Af3E529d0E689Bd8B",
-"0x96e52de6892d4B4811cEaa929E912cCd90fd6041",
-"0x999DcBFB36796420CeF7FBC0f17FB991E438A313",
-"0x999eDc48491ff7f97B534799f84e74ea4a3E48C2",
-"0x9a6eA2EaEAa4d1c963c6Ab38C92cCD1D466205D6",
-"0x9B020995CD6DD4f7Ed1330018F37C25E3D4051ca",
-"0x9cC4E20Cb732c563Fff4485e81fFae65A794A2a0",
-"0x9dfb54AFE0f291558ee0841324cba51B5b65Cf39",
-"0x9E6c73e6B32349B1854ADFC49cF7a06Ff1451d10",
-"0x9fadE887B1689a4A7d3f4889E524b750376823F0",
-"0xa061acfF1F6E2EA29A1e66553Fb903EAEacfdA54",
-"0xa2D4E293463D037c885857DeEaE1bdCf810C332C",
-"0xa3F2E192415934368EfdD420bd3196fA53988C5C",
-"0xA7498F4A5FA5c3D92D4D55b379B79a54DDA6B991",
-"0xA92Fdb2Dd67C88584C874f054f3a650214997D67",
-"0xACc2b341C18c3638F22113550baC06811369862A",
-"0xb8c3c19EEEeb0b4724c74478E6E17329678B22b2",
-"0xb9Dcc05b440B44Cc3fDdE5CbCA06107ea0e433C7",
-"0xbDfb87ed061E72Ad0F8531c45adc31F73235D53F",
-"0xbeE754CfD392466b307416651CfDFC6E827aCD38",
-"0xc03d3ce721962407Ed5Bf2d498461596BBC6F9E0",
-"0xC102162adE382eCb5C6D8d28Bfc264e67c00814C",
-"0xc7626F3fD4f4463ec5df079CB5582a8E2E2Aa213",
-"0xCB08161268fc240f93DBb07c263ab5843030BcE7",
-"0xCb85e7028Fe99d6a0309c9cF94A168275dd6e2e9",
-"0xCd50f97d409101dFD2613CaFd0b7A9c27aD7f080",
-"0xD0dBE93B5a634187e4cCf1492a1ef1BCA950171c",
-"0xd5Ebcee0A62226bb9F9C128dEC3f5caabB40F7D8",
-"0xD75f9358F4C044c536766708240107FEd8920541",
-"0xd978cdb50cfD9B50305a24B3B7bE2D2949dAb2cB",
-"0xDf9B3c849E044C6D6c9c6E61E78dE3317E475d78",
-"0xe28bB082d323CEFae343503AE3d9eF4514eB98Ac",
-"0xE4640b4FBc505B22A4Ceb9bD26425662164A14c0",
-"0xE5542ACBf22e8e7d5A3e1839C4052944d63E620A",
-"0xEC2B50d1bfd43Be63EE516Bf9843C0720B29e85E",
-"0xEe7a16e6fD8eC66D69280DC394CEfCa4A1111B9C",
-"0xeFB48dA58341A9B2662025dB64341756beb69C40",
-"0xf2cEa691008De0ccfdd1d245184bE9372Cd4d69a",
-"0xF5071Efd6239240a36cc56Ec9f7ffde58267593A",
-"0xF6C4D5bcCc2206cDD41a459172510770f138526B",
-"0xF954e7239E8E5B77437130008289F4c64c717CC5",
-"0xfbbE036A57205620c3440586B2Cd9AbbE4C5a6c7"
-            };
-
-            // DEV 環境測試資料
-            return new string[] {
+            if (isAmoyTestNet)
+            {
+                // DEV 環境測試資料
+                return new string[] {
 "0x0937EfF0810EE7908d143350ab59215a18989F82",
 "0x098B6b71B1b54320A4788c89Ab59ce42264a3c54",
 "0x10091d89d4A9991b9BEfd35A2C5Ae78f812486e9",
@@ -725,56 +677,99 @@ namespace EthScanNet.Test
 "0xF5413E4975A3ceCF077E91776d4fF2BF1c78eaB6",
 "0xf5Ce60B326188F43d9847F18d8F1E44f07DBd54F",
 "0xf7ea5Ee811aA3846BE7a5792c28B24decF006f6D"
-
 };
+            }
+
+            // 生產
+            return new string[] {
+"0x00a8857B318FD982D851e9479Bf14BAD6a97dAc5",
+"0x032453F0bc6b47737A0Ff365770Adf1187a02427",
+"0x0520C7206A92b0e2Ec9dAc3a218629426928fa4f",
+"0x0a6F2371f5aAafBEaE90b07E7B82C9c39FBDf03c",
+"0x11e8c96d5220941de18408bFA6Ff4b2660f78D64",
+"0x1c6e67C38a5d596876A75b2bA163EB23991b1185",
+"0x1E887672FCdDBc15Cb9E333Dd0eD5270ea7DBF96",
+"0x2075968DC74cE26085e314eaD60A749915Bf6709",
+"0x20F52fA27e271d8BB3da803816D19b89fd915B2c",
+"0x210440b63B213d0Ef4610baB7d13AE9288C59Ba8",
+"0x2329f2A0e089a39A7F90c9c2dF256a77B9C705D0",
+"0x2553451F102ac62C4746CC0f6ACa352893dFDB5a",
+"0x2aD4ca615891ceE3537A48A90b8d75F15921818A",
+"0x2B0DdD462b1f5e6c3247ce84cF6926Bbc401AabE",
+"0x2BA7cC08Ed4AB3F273B8290F5D1A62B4CC001224",
+"0x2FF28c882793759Ff0007f920e2707475c7Fb997",
+"0x311494E4A63C8824ac1156ffb19d4e0b44E43E7d",
+"0x32De07A0C50e370523E250686E16f43802AFF6F4",
+"0x33e9cd9760d4109f3c5A0dAEF16Ec4540EEb327e",
+"0x3A5963A079EBc3d03Db173BD2C0E7CBcd8f07B46",
+"0x45B09b0911a218770332192fc2b17fBb4344AB9d",
+"0x4918204d860c7DeFd9623dEc9663fdc11a774b68",
+"0x4Ad9400223F81f8EfE44F76784531f13AEEc8677",
+"0x4b2Bce197514e29d5261BeE90E3Aa51Cbfc85CD3",
+"0x51f1E63055fb0241BA3cec2BC120D33343056020",
+"0x5625246c50066205c32D9fBb9ce75bbc8C291f88",
+"0x5d9704561eA0D7DE25Eff4651DadF9F352619413",
+"0x6607a9dc64103AaD306cf02005Cee32372789157",
+"0x661EaE22CBA9eCB3e5034a70bF40ef7147B094cf",
+"0x66E3AdA72dBE3be61f07087834202E18089d857f",
+"0x6aD719c49ECbf0ab5cBe8d7Df0C780961A61c52D",
+"0x6ADbcF356520a5C23A7E6bA1a6e00092ae6D5e2a",
+"0x73eE120Cc56a170bfF6D3C901D9fe92D1c4178c3",
+"0x75b938a9Edf420f5a45f12e480DaDEbFd18d2C94",
+"0x76f842c19Dbc9d85D99A985E86fe076fAfce7873",
+"0x7837E098DF1d0828C917F1b9c7053924c4B4A838",
+"0x79B1A08439c0Bb40B531644fA3C0E6c913033802",
+"0x7bA1A794B9f2B789cC4e0367C4FAe73d67f22576",
+"0x7d20b3F4483DE8BA5C4A7A07df938997962e6198",
+"0x88FF80CDf97a07205F830eAF11C86bff81d34E2d",
+"0x8dc6eF08285C7ea08cbd9fb9e825C648D739ff94",
+"0x91Bb8D7F722D609f1950B6A8f5FBA5e450C38e88",
+"0x9d4b3F99ac6771c27358830159a49247CC99F643",
+"0xa13bE7781dB4304C1BAEDA797708Da50239aaD22",
+"0xA4E18855Db3b80869D438B9924da8a5219CB32a3",
+"0xa7AFCa84B3028d3C35279baBe4Cf4Bc393CB87c7",
+"0xA933e36A4df66051C79C448d91590a92A2151A77",
+"0xaE3CF1629Dcd78553C80E7E0de52cE1B8c87f67A",
+"0xB3Ee21B1E42C3317363adf6DBbaa0f7F47BB4F63",
+"0xb75Cba438685130ba19443B8Fc5E462b947291B2",
+"0xc1545700C3D7ba17396d8f2D5bA6941492a42297",
+"0xc725a2D88f3C3a7D9FE80fe491DBdD2Fc7008100",
+"0xcbC288d47044C324Eec3120b0C16bd61b9bBA083",
+"0xD377263bF3Bf40Ca29361FF64D8100Ae1Ea7117B",
+"0xd5B2706bc7A705Ce3d03E273CA5b0437bE6a1C02",
+"0xdB70eF1eF81d2b096EB787803fb7b53AcbD9D726",
+"0xDED91228e085a80B5e0c1554bFeD84DA85c4DD7c",
+"0xdf2A56221B9aDD6502B11eAa78cd740553684Dc2",
+"0xe21088f69CDDF05799d9F138940287ecF893f6AD",
+"0xe531669ed912B5AaC74a3536DAc374797C312033",
+"0xE5D228845B79aB77544abc278F84465BE02e0ebb",
+"0xE7406058df7a99448B403be3Ce8cE92474a7000D",
+"0xEc813c1F846ec66be75bda16bED5dfC5b9b44aA8",
+"0xEF2b3E8a7232396B9D4570BE68131391026c7e30",
+"0xF14364460716dC07767d1D98EceA95479665cbe7",
+"0xf3791839D948b01de88A38735a94E97dA80B3E28",
+"0xF74d0907Ab56bD1DC24cffD21567AA4cD8EeEFFf",
+"0xf9C9ab0B9f926a1501b230545a01325F46934ebd"
+
+            };
         }
 
-        private static string[] GetDbEoaAddress()
+        /// <summary>
+        /// 取得Eoa合約地址清單
+        /// </summary>
+        /// <param name="isAmoyTestNet"></param>
+        /// <returns></returns>
+        private static string[] GetDbEoaAddress(bool isAmoyTestNet)
         {
             // 查詢語法
             //SELECT cep.Address
             //FROM BcChain.ChainEoaBalance ceb
             //INNER JOIN ChainEoaPool cep ON ceb.ChainEoaId = cep.ChainEoaId;
 
-            // 生產環境資料
-            return new string[] {
-"0xD02a7763cac2c95D013fBE8A93e406f37F83294f",
-"0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6",
-"0x78C887cEa45cC0348FfeD7d8e608450e9208A3C9",
-"0x6BbeAbA00f355f47273371da616cCbAf48A4D4df",
-"0x42274356b960839ea80B579288a95761De3ed286",
-"0x4d4dE502c5BCEeB3485e74742167BB256652Fb5f",
-"0xA52A6A0B068eC13e84d9799F501a2Beb2B1f151a",
-"0xD84e75E8b8d778B9A479b983eD96CfB53AAAD11F",
-"0xEc879b1F782792fd810187f70ae1EA281cF94B36",
-"0x7da24D11a7435AC8FAb23c21aC0c54DD4d8D9DA0",
-"0x9D36d09bEbdA35f8296A7ad8203AadB41bC6d05F",
-"0x50d724BC85A3Ac0C53a5C193301ff76dDDF7cF65",
-"0xcCDc837E87593F45a6f22b32f12044c1b77B618F",
-"0xD65FA62A13A62d4c030B988098a82B2091E3044d",
-"0xCbceEce03F3B9F0bCB4a6e16EA6cA9ee8B4dA21D",
-"0x6cDEA987Cb6b44784Fc72F771286f47c243FA4c5",
-"0x83EA875B024CE611f97e57f92a100e13ee3A5837",
-"0x78373d52E327F0463481cE252bDf78008781557C",
-"0x0219f11B57A3529e13B86f6F117e8099aFb91F79",
-"0x238cA150A5923134E5bA235C6986d9CF6689C71D",
-"0x3A5202c23e3E23C6DDA0900F700AAA9508854462",
-"0xB5c6410541306CaC3551C170A33E344215484DE4",
-"0x92376364cebf755c718C536F065be2f6Bf2Ed1dB",
-"0x280426b6cD6C6cB90bcDa3ac8867362a370b4555",
-"0x3B203e70472BA9e0a428d04773FCC6fF2452f202",
-"0x360B58C907081B26D45317A2fEed56840a5887f0",
-"0x2a94bf8BEA54a3D15F5Df6dd01D8aF9f774Ff5aD",
-"0xd5f4150ABF60DfAAA0D6Be277310d4c989AeAA01",
-"0x30D1Ffa04003E075f4C8d06f1a8E4c4aC56514E0",
-"0x66627f60561964B2148ef9eEf3C3F7Dc074038a1",
-"0x437eA7D2339825d142e8EEAD2d326E9C1Ef17658"
-
-};
-
-
-            // DEV環境測試資料
-            return new string[] {
+            if (isAmoyTestNet)
+            {
+                // DEV環境測試資料
+                return new string[] {
 "0x5d3697A3F9f9D825F2a54ec198977aAf9C7Be061",
 "0x919a55d312Bb712c8B3fd75dEaf6a76b4095c542",
 "0x7D88BdBA692c0351929e408999b20a046234ed3c",
@@ -823,6 +818,42 @@ namespace EthScanNet.Test
 "0xF19c1b4A6a391667335edfacCbD3393E375787Dd",
 "0x3b9c80C47841f7988d512A601Cd4595EC97DeCdA",
 "0x6Df77e4D5D25177795b0B60Ce85Bd4241B144D8E"
+};
+            }
+
+            // 生產環境資料
+            return new string[] {
+"0xD02a7763cac2c95D013fBE8A93e406f37F83294f",
+"0xF177B7F19aD64a9C04a45cd9E41505b1c9A5B4C6",
+"0x78C887cEa45cC0348FfeD7d8e608450e9208A3C9",
+"0x6BbeAbA00f355f47273371da616cCbAf48A4D4df",
+"0x42274356b960839ea80B579288a95761De3ed286",
+"0x4d4dE502c5BCEeB3485e74742167BB256652Fb5f",
+"0xA52A6A0B068eC13e84d9799F501a2Beb2B1f151a",
+"0xD84e75E8b8d778B9A479b983eD96CfB53AAAD11F",
+"0xEc879b1F782792fd810187f70ae1EA281cF94B36",
+"0x7da24D11a7435AC8FAb23c21aC0c54DD4d8D9DA0",
+"0x9D36d09bEbdA35f8296A7ad8203AadB41bC6d05F",
+"0x50d724BC85A3Ac0C53a5C193301ff76dDDF7cF65",
+"0xcCDc837E87593F45a6f22b32f12044c1b77B618F",
+"0xD65FA62A13A62d4c030B988098a82B2091E3044d",
+"0xCbceEce03F3B9F0bCB4a6e16EA6cA9ee8B4dA21D",
+"0x6cDEA987Cb6b44784Fc72F771286f47c243FA4c5",
+"0x83EA875B024CE611f97e57f92a100e13ee3A5837",
+"0x78373d52E327F0463481cE252bDf78008781557C",
+"0x0219f11B57A3529e13B86f6F117e8099aFb91F79",
+"0x238cA150A5923134E5bA235C6986d9CF6689C71D",
+"0x3A5202c23e3E23C6DDA0900F700AAA9508854462",
+"0xB5c6410541306CaC3551C170A33E344215484DE4",
+"0x92376364cebf755c718C536F065be2f6Bf2Ed1dB",
+"0x280426b6cD6C6cB90bcDa3ac8867362a370b4555",
+"0x3B203e70472BA9e0a428d04773FCC6fF2452f202",
+"0x360B58C907081B26D45317A2fEed56840a5887f0",
+"0x2a94bf8BEA54a3D15F5Df6dd01D8aF9f774Ff5aD",
+"0xd5f4150ABF60DfAAA0D6Be277310d4c989AeAA01",
+"0x30D1Ffa04003E075f4C8d06f1a8E4c4aC56514E0",
+"0x66627f60561964B2148ef9eEf3C3F7Dc074038a1",
+"0x437eA7D2339825d142e8EEAD2d326E9C1Ef17658"
 
 };
         }
