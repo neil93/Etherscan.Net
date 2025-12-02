@@ -211,7 +211,7 @@ namespace EthScanNet.Test
             return blockResponse;
         }
 
-        private async Task ExecuteBlock(EScanClient client, string amoyUsdcContract, string[] eoaAddress, string[] walletContractAddress, string[] gameContractAddress, string[] oracleContractAddress, BlockInfo blockInfo)
+        private async Task ExecuteBlock(EScanClient client, string usdcContract, string[] eoaAddress, string[] walletContractAddress, string[] gameContractAddress, string[] oracleContractAddress, BlockInfo blockInfo)
         {
             var blockStopwatch = System.Diagnostics.Stopwatch.StartNew();
             const int performanceThresholdMs = 1000; // 效能門檻：1秒
@@ -221,7 +221,10 @@ namespace EthScanNet.Test
             var transactions = blockInfo.Transactions.Where(t => t.To != null
                                                                  && (walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase)
                                                                  || eoaAddress.Contains(t.From, StringComparer.OrdinalIgnoreCase)
-                                                                 || t.To.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase))
+                                                                 //|| t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)
+                                                                 ||(t.To.Equals(usdcContract, StringComparison.OrdinalIgnoreCase) && walletContractAddress.Contains(t.To, StringComparer.OrdinalIgnoreCase))
+
+                                                                 )
                                                            )
                                                      .ToList();
             filterStopwatch.Stop();
@@ -245,7 +248,7 @@ namespace EthScanNet.Test
                 // 質押
                 var stakeStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 var transferEvent = ConvertLogsToEvent<UsdcEventTransfer>(receiptInfos.Logs);
-                var resultEvents = transferEvent.Where(e => e.Log.Address.Equals(amoyUsdcContract, StringComparison.OrdinalIgnoreCase)
+                var resultEvents = transferEvent.Where(e => e.Log.Address.Equals(usdcContract, StringComparison.OrdinalIgnoreCase)
                                                         && !eoaAddress.Contains(e.Event.From)
                                                         && walletContractAddress.Contains(e.Event.To, StringComparer.OrdinalIgnoreCase)).ToList();
 
