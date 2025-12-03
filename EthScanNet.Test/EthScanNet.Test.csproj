@@ -9,6 +9,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Remove="NethereumDemo.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     </ItemGroup>
 

@@ -34,6 +34,8 @@ namespace EthScanNet.Test
             {
                 await RunProxyFucntionCommandsAsync(client);
 
+                //await RunLogsCommandsAsync(client, "0x1bad4fc", "0x1bad4fc");
+
                 Console.WriteLine();
             }
             catch (Exception e)
@@ -58,19 +60,19 @@ namespace EthScanNet.Test
             }
 
             // USDC Contract - USDC 合約地址
-            string usdcContract = GetUsdcContract(isTestAmoyChain);
+            string usdcContract = ContractAddresses.GetUsdcContract(isTestAmoyChain);
 
             // EOA Address
-            string[] eoaAddress = GetDbEoaAddress(isTestAmoyChain);
+            string[] eoaAddress = ContractAddresses.GetDbEoaAddress(isTestAmoyChain);
 
             // Walet Contract Address
-            string[] walletContractAddress = GetWalletContractAddress(isTestAmoyChain);
+            string[] walletContractAddress = ContractAddresses.GetWalletContractAddress(isTestAmoyChain);
 
             // Game Contract Address
-            string[] gameContractAddress = GetGameContractAddress(isTestAmoyChain);
+            string[] gameContractAddress = ContractAddresses.GetGameContractAddress(isTestAmoyChain);
 
             // Oracle Contract Address
-            string[] oracleContractAddress = GetOracleContractAddress(isTestAmoyChain);
+            string[] oracleContractAddress = ContractAddresses.GetOracleContractAddress(isTestAmoyChain);
 
             string currentNumber;
             var number = 0;  // 要測試特定區塊號時才輸入
@@ -99,10 +101,10 @@ namespace EthScanNet.Test
                         var endNumber = ConvertHexToDecimal(currentNumber);
                         Console.WriteLine($"批次處理:{ConvertHexToDecimal(oldCurrentNumber)}-{ConvertHexToDecimal(currentNumber)}");
 
-                        // 使用Logs
+                        // TODO 使用Logs - 待測試
                         //await RunLogsCommandsAsync(client, startNumber.ToString(), endNumber.ToString());
 
-                        // 並發處理區塊，最高並發量為3
+                        // 並發處理區塊，最高並發量為1 - 免費版最大併發量是3
                         var semaphore = new System.Threading.SemaphoreSlim(1, 1);
                         var tasks = new List<Task>();
 
@@ -179,23 +181,6 @@ namespace EthScanNet.Test
                         isNeedGetNewBlock = true;
                     }
                 }
-            }
-        }
-
-        /// <summary>
-        /// 取得USDC合約地址
-        /// </summary>
-        /// <param name="isAmoyTestNet"></param>
-        /// <returns></returns>
-        private static string GetUsdcContract(bool isAmoyTestNet)
-        {
-            if (isAmoyTestNet)
-            {
-                return "0x5bC0720B80f66C8a0F0ba32F1f949D101C24171A";
-            }
-            else
-            {
-                return "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359";
             }
         }
 
@@ -380,7 +365,7 @@ namespace EthScanNet.Test
         //    var bindWalletTopic0 = "0x0ca052931610b15a08f6d7b445a2be5e2d377dd2c8945678bb64fbecb2725708";
         //    var transferTopic0 = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
         //    var redeemTopic0 = "0x378f55a9a0032096f81e501f6fba06e54947e956df2afe99d645ca71183fb269";
-        //    var preSignedTopic0 = "0xbb8f597c6a23e718c7579b21e311c3daf7851a8456dbb20e97b3124cd3a66022";
+        //    var preSignedTopic0 = "0x0ed6ac937d387472d08eb1a22ae552d946a90c5db2895e40efa8f5ea66a2267a";
 
         //    var usdcContractAddress = "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359";     // USDC 合約地址
 
@@ -439,9 +424,9 @@ namespace EthScanNet.Test
             EScanLogs logs = await client.Logs.GetLogsAsync(fromBlock: startBlock, toBlock: toBlock, topic0: transferTopic0, page: 1, offset: 10000);
             var transferEvent = await GetBoundWalletEvent<UsdcEventTransfer>(logs);
 
-            var eoaAddress = GetDbEoaAddress(true);
+            var eoaAddress = ContractAddresses.GetDbEoaAddress(true);
 
-            var walletContractAddress = GetWalletContractAddress(true);
+            var walletContractAddress = ContractAddresses.GetWalletContractAddress(true);
 
             var qq = transferEvent.Where(e => !eoaAddress.Contains(e.Event.From)
                 && e.Log.Address == usdcContractAddress

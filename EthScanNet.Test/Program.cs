@@ -14,14 +14,18 @@ namespace EthScanNet.Test
 
         private static async Task RunApiCommands()
         {
-            string apiKey = "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
-
-            EScanNetwork eScanNetwork = new("https://api-rinkeby.etherscan.io/api");
-            EtherscanDemo demo = new EtherscanDemo(apiKey, EScanNetwork.PolygonAmy);
-
             try
             {
+                string apiKey = "BSSW4GUFFWEHWB8V4T6S66VFDEUXZ5RAEM";
+                EtherscanDemo demo = new EtherscanDemo(apiKey, EScanNetwork.PolygonAmy);
                 await demo.RunApiCommandsAsync();
+
+
+                //var mainnetRpc = "https://polygon-bor-rpc.publicnode.com";
+                //var amoyRpc = "https://polygon-amoy-bor-rpc.publicnode.com";
+                //NethereumDemo nethereumDemo = new NethereumDemo(mainnetRpc, false);
+                ////NethereumDemo nethereumDemo = new NethereumDemo(amoyRpc);
+                //await nethereumDemo.RunApiCommandsAsync();
             }
             catch (Exception e)
             {
